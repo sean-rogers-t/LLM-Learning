@@ -1,0 +1,576 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype,amsmath,amssymb,amsthm,booktabs}
+\usepackage[margin=0.88in,headheight=14pt]{geometry}
+\usepackage{enumitem,fancyhdr,xcolor}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue!45!black]{hyperref}
+\hypersetup{pdftitle={Statistics and Predictive Modeling: Course Notes},pdfauthor={Prepared for Sean Rogers}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlist{itemsep=3pt,topsep=5pt,leftmargin=*}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Statistics and Predictive Modeling}
+\fancyhead[R]{\small Lesson 1}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\newcommand{\E}{\mathbb E}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\SE}{\operatorname{SE}}
+\newcommand{\SD}{\operatorname{SD}}
+\newcommand{\MSE}{\operatorname{MSE}}
+\newcommand{\RMSE}{\operatorname{RMSE}}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Worked example}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\numberwithin{equation}{section}
+\begin{document}
+\thispagestyle{empty}
+\begin{center}
+{\Large\scshape Course Notes}\par\vspace{0.3in}
+{\Huge Statistics and\\[6pt] Predictive Modeling}\par\vspace{0.2in}
+{\large An exercise-first course for Sean Rogers}\par
+\vspace{0.15in}
+{\normalsize Cumulative edition \textbullet\ Lesson 1 \textbullet\ September 22, 2026}
+\end{center}
+\vspace{0.15in}
+\hrule
+\vspace{0.12in}
+\textbf{Lesson 1. Sampling distributions and generalization.}
+The central question is not merely how well a model performed on one dataset,
+but what that performance tells us about its behavior on future data.
+These notes connect sample means, uncertainty, paired comparisons, and hypothesis
+tests to that question.
+
+\textbf{How to use these notes.} Read the definitions and proofs, then cover the
+worked solutions and reproduce their reasoning. The final sections contain
+retrieval exercises and a separate answer key. The interactive lesson is designed
+for approximately 30 minutes; this reference develops the details more fully.
+
+\tableofcontents
+\vfill
+\textbf{Cumulative-document convention.} New completed lessons will be appended
+as new numbered sections, preserving prior lessons and updating the contents.
+This edition contains Lesson 1 only. The matching \texttt{.tex} source is the
+editable master.
+\newpage
+
+\section{Lesson 1: Sampling distributions and generalization}
+\subsection{The prediction problem and its statistical objects}
+\begin{definition}[Population, sample, statistic, and parameter]
+A \emph{population distribution} $P$ describes possible observations $Z=(X,Y)$,
+where $X$ contains predictors and $Y$ is the outcome. A \emph{sample} is a
+collection $Z_1,\ldots,Z_n$ drawn from that population. A \emph{statistic}
+$T=T(Z_1,\ldots,Z_n)$ is a function of the observed data that does not depend
+on unknown parameters. A \emph{parameter}, such as $\E_P[Y]$, is a fixed
+feature of $P$ in the frequentist framework.
+\end{definition}
+\begin{definition}[Sampling distribution and standard error]
+The \emph{sampling distribution} of $T$ is its probability distribution under
+repeated sampling using the specified sampling procedure. Its \emph{standard
+error} is $\SE(T)=\sqrt{\Var(T)}$. An estimated standard error replaces unknown
+population quantities with estimates.
+\end{definition}
+The statistic is random \emph{before} the sample is observed; its realized value
+is a number. A sampling distribution is not the distribution of individual
+observations within one sample.
+
+\textbf{Notation.} A fitted model is $\hat f$. Unless explicitly stated otherwise,
+we hold $\hat f$ fixed and evaluate it using fresh observations independent of
+its training data. Squared loss is $L=(Y-\hat f(X))^2$.
+
+\begin{example}[Training performance versus generalization]
+The original house-price model has training RMSE \$8,000 and test RMSE \$42,000.
+A simpler model has training RMSE \$25,000 and test RMSE \$30,000.
+
+\emph{Interpretation.} The first model's large gap is consistent with overfitting,
+assuming a comparable train/test distribution and a valid evaluation. The simpler
+model performs better on this test set. Its smaller gap does not prove underfitting:
+underfitting concerns failure to capture useful structure, relative to attainable
+performance, not merely the size of the gap.
+
+\emph{What remains uncertain?} Results may depend on the test sample, distribution
+shift, or prior model selection. Compare against a baseline, inspect learning
+curves, and use validation appropriate to the intended deployment population.
+If test results are used to choose a model, that set is functioning as validation
+data; obtain a fresh final evaluation for the selected model.
+\end{example}
+\textbf{Terminology.} RMSE is an evaluation statistic. ``Test statistic'' usually
+means a statistic used in a hypothesis test, not any statistic calculated on a
+machine-learning test set.
+\newpage
+
+\subsection{Sample means: expectation, variance, and precision}
+\begin{theorem}[Moments of an i.i.d. sample mean]
+Let $X_1,\ldots,X_n$ be independent and identically distributed, with
+$\E[X_i]=\mu$ and $\Var(X_i)=\sigma^2<\infty$. Then
+\begin{equation}
+\bar X=\frac1n\sum_{i=1}^nX_i,\qquad
+\E[\bar X]=\mu,\qquad
+\Var(\bar X)=\frac{\sigma^2}{n},\qquad
+\SE(\bar X)=\frac{\sigma}{\sqrt n}.
+\end{equation}
+\end{theorem}
+\begin{proof}
+Linearity of expectation gives
+\[
+\E[\bar X]=\frac1n\sum_{i=1}^n\E[X_i]=\mu.
+\]
+Using $\Var(cX)=c^2\Var(X)$ and independence,
+\[
+\Var(\bar X)=\frac1{n^2}\Var\!\left(\sum_{i=1}^nX_i\right)
+=\frac1{n^2}\sum_{i=1}^n\Var(X_i)=\frac{n\sigma^2}{n^2}.
+\]
+Taking the square root gives the standard error.
+\end{proof}
+Independence is not needed for the expectation calculation. Pairwise zero
+covariances suffice for the displayed variance calculation. Normality is not
+needed for either result.
+
+\begin{example}[Mean house price]
+Individual prices have mean \$400,000 and standard deviation \$150,000.
+For an i.i.d. sample of 100 houses,
+\[
+\E[\bar X]=\$400{,}000,\qquad
+\SE(\bar X)=\frac{\$150{,}000}{10}=\$15{,}000.
+\]
+Individual prices still have standard deviation \$150,000. It is the sample mean
+whose standard deviation is \$15,000.
+\end{example}
+\begin{example}[Halving uncertainty]
+To halve a standard error proportional to $n^{-1/2}$, solve
+\[
+\frac{\sigma}{\sqrt{n_{\mathrm{new}}}}
+=\frac12\frac{\sigma}{\sqrt{n_{\mathrm{old}}}}
+\quad\Longrightarrow\quad n_{\mathrm{new}}=4n_{\mathrm{old}}.
+\]
+This is exact for the sample mean under the stated assumptions. For more general
+metrics, such as RMSE, it is typically an asymptotic rule requiring additional
+regularity. It is not a guarantee for every metric or sampling design.
+\end{example}
+\textbf{When $\sigma$ is unknown.} With
+$s^2=(n-1)^{-1}\sum_i(X_i-\bar X)^2$, the usual estimated standard error is
+$s/\sqrt n$. Always distinguish a variance from its square root.
+\newpage
+
+\subsection{The law of large numbers and the central limit theorem}
+These theorems answer different questions: \emph{where does an average go}, and
+\emph{what do its rescaled fluctuations look like}?
+
+\begin{theorem}[Weak law of large numbers; finite-variance version]
+Under the sample-mean assumptions above, for every $\varepsilon>0$,
+\[
+\Pr(|\bar X_n-\mu|>\varepsilon)\longrightarrow0.
+\]
+Thus $\bar X_n\xrightarrow{p}\mu$.
+\end{theorem}
+\begin{proof}
+Chebyshev's inequality gives
+\[
+\Pr(|\bar X_n-\mu|>\varepsilon)
+\leq\frac{\Var(\bar X_n)}{\varepsilon^2}
+=\frac{\sigma^2}{n\varepsilon^2}\longrightarrow0.
+\]
+\end{proof}
+
+\begin{theorem}[Classical i.i.d. central limit theorem]
+If the $X_i$ are i.i.d. with mean $\mu$ and variance $0<\sigma^2<\infty$, then
+\begin{equation}
+\frac{\sqrt n(\bar X_n-\mu)}{\sigma}\xrightarrow{d}N(0,1).
+\end{equation}
+\end{theorem}
+For an adequate sample size, this motivates
+$\bar X_n\approx N(\mu,\sigma^2/n)$. Here the second argument of $N$ denotes
+\emph{variance}, not standard deviation. The CLT is stated without proof in this
+lesson.
+
+\textbf{What the CLT does not say.}
+\begin{itemize}
+\item Individual observations become normally distributed as $n$ increases.
+\item Every sample of size 30 or 100 yields an accurate normal approximation.
+\item Dependence, infinite variance, or selection bias can be ignored.
+\end{itemize}
+If individual observations are normal, their sample mean is exactly normal for
+every $n$. Otherwise the approximation can be slow, especially for heavy tails.
+
+\begin{example}[Approximate probability for an estimated MSE]
+Suppose squared losses have mean 900 and variance 40,000. With $n=100$,
+the sample MSE has mean 900 and standard error 20, so the CLT suggests
+\[
+\Pr(860\leq\widehat{\MSE}\leq940)
+\approx\Pr\!\left(\frac{860-900}{20}\leq Z\leq\frac{940-900}{20}\right)
+=\Pr(-2\leq Z\leq2)\approx0.9545.
+\]
+Both endpoints are two standard errors from the mean. This is a repeated-sample
+probability with population mean specified, not yet an interval estimating an
+unknown population mean.
+\end{example}
+\newpage
+
+\subsection{Prediction risk, MSE, and RMSE}
+\begin{definition}[Population risk and empirical test risk]
+For a fixed model $\hat f$ and loss function $\ell$, the population prediction
+risk is $R(\hat f)=\E_P[\ell(Y,\hat f(X))]$. Its empirical test estimate is
+\[
+\widehat R=\frac1n\sum_{i=1}^n\ell(Y_i,\hat f(X_i)).
+\]
+The expectation is over a new observation from the target population.
+\end{definition}
+For squared loss, set $L_i=(Y_i-\hat f(X_i))^2$. Then
+\[
+\widehat{\MSE}=\bar L,\qquad
+\widehat{\RMSE}=\sqrt{\bar L},\qquad
+\MSE=\E[L],\qquad \RMSE=\sqrt{\E[L]}.
+\]
+If test observations are i.i.d. and independent of training, conditional on the
+fitted model the losses are i.i.d. With $\mu_L=\E[L]$ and
+$\tau^2=\Var(L)<\infty$,
+\begin{equation}
+\E[\widehat{\MSE}]=\mu_L,\quad
+\Var(\widehat{\MSE})=\frac{\tau^2}{n},\quad
+\SE(\widehat{\MSE})=\frac{\tau}{\sqrt n}.
+\end{equation}
+\begin{example}[The full MSE calculation]
+For $\mu_L=900$, $\tau^2=40{,}000$, and $n=100$,
+\[
+\E[\widehat{\MSE}]=900,\quad
+\Var(\widehat{\MSE})=400,\quad
+\SE(\widehat{\MSE})=20.
+\]
+The standard deviation of an individual squared loss is $\tau=200$; it is not
+20. MSE and its standard error have units of outcome squared.
+\end{example}
+\textbf{Moment condition.} Finite variance of squared loss requires a finite
+fourth moment of the prediction error: $\E[(Y-\hat f(X))^4]<\infty$.
+Finite MSE alone does not ensure the usual CLT for estimated MSE.
+
+\textbf{RMSE is nonlinear.} In general,
+\[
+\E[\sqrt{\bar L}]\neq\sqrt{\E[\bar L]}.
+\]
+Concavity of the square root implies a downward bias by Jensen's inequality.
+For $\mu_L>0$, a first-order Taylor approximation (the \emph{delta method}) gives
+\[
+\SE(\widehat{\RMSE})\approx
+\frac{\tau}{2\sqrt{\mu_L}\sqrt n}.
+\]
+In the example this is $20/(2\cdot30)=1/3$ outcome units. This is an approximation,
+not an exact sample-mean formula for RMSE.
+
+\textbf{Two sources of randomness.} Retraining on new training data changes
+$\hat f$; drawing new test data changes its measured score. Our calculations
+isolate the latter, conditional on the fitted model.
+\newpage
+
+\subsection{Paired comparisons: compare the models on the same cases}
+For two fixed models evaluated on the same observation $i$, define
+\[
+L_{A,i}=(Y_i-\hat f_A(X_i))^2,\quad
+L_{B,i}=(Y_i-\hat f_B(X_i))^2,\quad D_i=L_{A,i}-L_{B,i}.
+\]
+Let $\Delta=\E[D_i]=R(\hat f_A)-R(\hat f_B)$.
+Negative $\Delta$ favors $A$; positive $\Delta$ favors $B$.
+\begin{proposition}[Pairing preserves the estimand]
+The average paired loss difference equals the difference of empirical MSEs:
+\[
+\bar D=\frac1n\sum_i(L_{A,i}-L_{B,i})
+=\widehat{\MSE}_A-\widehat{\MSE}_B.
+\]
+Moreover,
+\begin{equation}
+\Var(D_i)=\Var(L_{A,i})+\Var(L_{B,i})-2\Cov(L_{A,i},L_{B,i}).
+\end{equation}
+\end{proposition}
+\begin{proof}
+The first identity is linearity of summation. For the second, expand the square
+of $(L_A-\E L_A)-(L_B-\E L_B)$ and take expectations.
+\end{proof}
+Pairing does not demand that $A$ win on every case. It measures its \emph{average}
+advantage while accounting for shared case difficulty. Positive within-case
+covariance of the two losses reduces the variance of their difference.
+
+\begin{example}[Paired standard error]
+Suppose
+\[
+\Var(L_A)=400,\qquad\Var(L_B)=500,\qquad\Cov(L_A,L_B)=350.
+\]
+Then
+\[
+\Var(D_i)=400+500-2(350)=200.
+\]
+For 100 independent test cases,
+\[
+\Var(\bar D)=\frac{200}{100}=2,\qquad
+\SE(\bar D)=\sqrt2\approx1.414.
+\]
+Ignoring the pairing would give $\sqrt{(400+500)/100}=3$, which is too large
+for these paired data. Truly independent test sets of 100 cases per model
+would instead have that standard error under these marginal variances.
+\end{example}
+\textbf{In practice.} Estimate the standard deviation of the observed $D_i$:
+\[
+s_D^2=\frac1{n-1}\sum_i(D_i-\bar D)^2,\qquad
+\widehat{\SE}(\bar D)=\frac{s_D}{\sqrt n}.
+\]
+This is simpler than separately estimating all three variance/covariance terms.
+The numerical variances in this example are a new hypothetical setup, separate
+from the previous MSE example.
+\newpage
+
+\subsection{Confidence intervals and two-sided tests}
+\begin{definition}[Frequentist confidence interval]
+A confidence procedure $C(\text{data})$ with 95\% coverage contains the fixed
+parameter in 95\% of repeated samples (approximately for an asymptotic procedure).
+After observation, the realized interval either contains the parameter or does
+not. Coverage is not a posterior probability for the parameter.
+\end{definition}
+If $\bar D$ is approximately normal with known standard error $s_0$, an approximate
+95\% confidence interval for $\Delta$ is
+\begin{equation}
+\bar D\pm1.96s_0.
+\end{equation}
+To test $H_0:\Delta=0$ against $H_1:\Delta\neq0$, use
+\[
+Z_{\mathrm{obs}}=\frac{\bar D-0}{s_0},\qquad
+p_{\mathrm{two}}=2\Phi(-|Z_{\mathrm{obs}}|),
+\]
+where $\Phi$ is the standard normal cumulative distribution function.
+Reject at level $\alpha=0.05$ when $|Z_{\mathrm{obs}}|>1.96$.
+
+\begin{example}[The observed advantage is $\bar D=-3$]
+Using $s_0=\sqrt2$,
+\[
+Z_{\mathrm{obs}}=-\frac3{\sqrt2}\approx-2.1213,
+\qquad p_{\mathrm{two}}\approx0.0339.
+\]
+The approximate 95\% interval is
+\[
+-3\pm1.96\sqrt2\approx(-5.772,-0.228).
+\]
+Zero is excluded, so the test rejects the equal-risk null at the 5\% level.
+Your shortcut $-3\pm2\sqrt2\approx(-5.828,-0.172)$ gives the same decision;
+under the normal approximation it has approximately 95.45\% coverage.
+\end{example}
+\textbf{Why the methods agree.} For any proposed value $\Delta_0$,
+\[
+\Delta_0\notin[\bar D-1.96s_0,\bar D+1.96s_0]
+\quad\Longleftrightarrow\quad
+\left|\frac{\bar D-\Delta_0}{s_0}\right|>1.96.
+\]
+Thus a two-sided confidence interval inverts the corresponding family of tests.
+
+\textbf{What a $p$-value means.} It is a probability, under the null model, of a
+test statistic at least as extreme in the specified tail(s). It is not the
+probability that the null is true, nor the probability that the result was
+``caused by chance.'' Statistical evidence is also distinct from practical
+importance: a 3-unit squared-loss reduction needs outcome-scale context.
+
+\textbf{Estimated standard errors.} Replacing $s_0$ with $s_D/\sqrt n$ gives a
+paired $t$ statistic. Under i.i.d. normal $D_i$, it has an exact $t_{n-1}$ null
+distribution. For nonnormal $D_i$, inference is generally approximate and can
+be unreliable with small samples or heavy tails.
+\newpage
+
+\subsection{One-sided tests: direction must be chosen in advance}
+If the prespecified question is whether model $A$ improves on model $B$, use
+\[
+H_0:\Delta\geq0\qquad\text{versus}\qquad H_1:\Delta<0.
+\]
+In the normal model with fixed known standard error, the largest lower-tail
+rejection probability within this null occurs at its boundary $\Delta=0$.
+Thus the lower-tail $p$-value is
+\[
+p_{\mathrm{one}}=\Phi(Z_{\mathrm{obs}}).
+\]
+At level 5\%, reject when $Z_{\mathrm{obs}}<-1.645$.
+
+\begin{example}[One-sided inference for the same observed difference]
+For $Z_{\mathrm{obs}}=-2.1213$,
+\[
+p_{\mathrm{one}}\approx0.0169.
+\]
+An equivalent 95\% one-sided confidence set is
+\[
+(-\infty,U],\qquad U=\bar D+1.645s_0
+=-3+1.645\sqrt2\approx-0.674.
+\]
+Because $U<0$, the set excludes all nonnegative values of $\Delta$, supporting
+the prespecified improvement claim.
+\end{example}
+\textbf{Why one-sided testing has more directional power.} It allocates all of
+the 5\% rejection probability to the lower tail. A two-sided 5\% test allocates
+2.5\% to each tail. A 95\% two-sided confidence interval is therefore not the
+interval counterpart of a one-sided 5\% test.
+
+\textbf{Why not choose the favorable direction afterward?} Under a continuous
+symmetric null, selecting whichever tail matches the observed sign and rejecting
+when its one-sided $p$-value is below 0.05 rejects in either 5\% tail. The actual
+Type I error is 10\%, not 5\%.
+
+\textbf{A surprising result still matters.} If the lower-tail test produces
+$Z_{\mathrm{obs}}=+5$, it does not establish the chosen claim that $A$ is better.
+It is strong evidence in the opposite direction, which should be reported.
+Prespecifying the test does not mean ignoring harmful results.
+
+\textbf{Decision guide.}
+\begin{itemize}
+\item Use a prespecified one-sided test when the inferential claim is directional,
+such as a candidate improving on an incumbent.
+\item Use a two-sided test when asking whether the models differ in either
+direction, or when the direction was not prespecified.
+\item Report effect size and uncertainty regardless of the test. Do not select
+the test, direction, or model after looking at test outcomes and then report
+an unadjusted confirmatory $p$-value.
+\end{itemize}
+\newpage
+
+\subsection{Dependence, effective information, and validation design}
+\begin{proposition}[Variance of an average with dependence]
+For random variables with finite second moments,
+\begin{equation}
+\Var(\bar D)=\frac1{n^2}\left[
+\sum_i\Var(D_i)+2\sum_{i<j}\Cov(D_i,D_j)\right].
+\end{equation}
+\end{proposition}
+This follows by expanding the variance of a sum. Positive covariance between
+different observations increases uncertainty relative to the independence formula.
+
+\begin{example}[Ten neighborhoods, ten houses each]
+Suppose the 100 test observations come from 10 independent neighborhoods.
+If loss differences $D_i$ for houses within a neighborhood have positive
+covariance, treating all 100 differences as independent underestimates
+$\SE(\bar D)$: it drops positive terms from the formula above.
+\end{example}
+\textbf{Important precision correction.} The relevant dependence is between
+the \emph{loss differences} $D_i$, not simply between raw prediction errors or
+predicted house prices. Correlated residuals do not by themselves prove positive
+covariance of squared-loss differences. Neighborhood effects might cancel
+between models. The conclusion holds when the $D_i$ themselves have the assumed
+positive within-neighborhood covariance.
+
+\textbf{Preview: effective sample size.} Suppose every cluster has $m$ observations,
+each $D_i$ has variance $\sigma_D^2$, within-cluster correlation is $\rho$, and
+different clusters are independent. Counting correlated pairs yields
+\[
+\Var(\bar D)=\frac{\sigma_D^2}{n}\bigl[1+(m-1)\rho\bigr],
+\qquad n_{\mathrm{eff}}=\frac{n}{1+(m-1)\rho}.
+\]
+For $n=100$, $m=10$, and $\rho=0.2$, the design effect is $2.8$,
+$n_{\mathrm{eff}}\approx35.7$, and the true standard error is
+$\sqrt{2.8}\approx1.67$ times the independence-based standard error.
+This formula relies on the equal-size, equal-correlation assumptions.
+
+\textbf{Two different covariance effects.}
+\begin{itemize}
+\item Positive covariance of $L_{A,i}$ and $L_{B,i}$ \emph{on the same case}
+reduces the variance of their difference through the $-2\Cov$ term.
+\item Positive covariance of $D_i$ and $D_j$ \emph{across different cases}
+increases the variance of their average through the $+2\Cov$ terms.
+\end{itemize}
+\textbf{Choose validation to match deployment.} Holding out entire neighborhoods
+assesses transfer to unseen neighborhoods. Predicting new houses in familiar
+neighborhoods is a different target; a within-neighborhood split is not inherently
+invalid for that goal. Dependence-aware uncertainty may still be required.
+Cluster-level resampling or cluster-robust methods can help, but only 10 independent
+clusters is a small sample and requires caution.
+\newpage
+
+\subsection{Retrieval practice and review plan}
+Attempt these without referring to the worked examples. Explain your assumptions,
+not just your arithmetic. Solutions begin on the next page.
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item Define a statistic, its sampling distribution, and its standard error.
+What is held fixed when we evaluate one already-trained model repeatedly?
+\item For i.i.d. $X_i$ with mean $\mu$ and variance $\sigma^2$, derive
+$\E[\bar X]$ and $\Var(\bar X)$. Which step needs zero covariances?
+\item You want one-third of your current standard error. How must $n$ change
+under $n^{-1/2}$ scaling?
+\item State the LLN and CLT in words. Which concerns consistency and which
+describes scaled fluctuations?
+\item If losses have mean 900 and variance 40,000, calculate the mean,
+variance, and standard error of their average for $n=400$.
+\item Explain why $\widehat{\MSE}$ is unbiased for population MSE but
+$\widehat{\RMSE}$ is generally not unbiased for population RMSE.
+\item Models are evaluated on the same cases. Their individual loss variances
+are 400 and 500 and their within-case loss covariance is 350. Calculate
+$\Var(D_i)$ and $\SE(\bar D)$ for $n=100$ independent cases.
+\item For $\bar D=-3$ and known standard error $\sqrt2$, compute the $z$ statistic,
+the two-sided 95\% interval, and the one-sided 95\% upper confidence bound.
+Explain the associated hypotheses.
+\item Why is it invalid to select a one-sided test's direction after seeing
+the observed effect? What is the null rejection rate when either 5\% tail
+is selected in this way under a symmetric continuous null?
+\item Explain why positive within-case covariance helps a paired comparison
+but positive across-case covariance can hurt precision. Identify the random
+variables in each covariance.
+\item A test set contains 10 independent neighborhoods with 10 houses each.
+Under the equal-correlation model with $\rho=0.2$, find the effective sample
+size. Would you use neighborhood-held-out validation for new neighborhoods
+or necessarily for every prediction task?
+\end{enumerate}
+
+\textbf{Spaced-review plan.} On the next study day, retrieve Questions 2, 7, and 10.
+About three days later, retrieve Questions 4, 6, and 8. After one week, mix all
+topics without notes; after two weeks, revisit missed items and solve numerical
+variants. These are study intervals, not additional scheduled notifications.
+
+\textbf{Personal review priorities from this lesson.} Your conceptual reasoning
+was strong: you recognized split uncertainty, understood paired comparisons,
+and correctly used interval inversion. Revisit the factor of 2 in the covariance
+identity, variance versus standard error, and one-sided versus two-sided thresholds.
+
+\textbf{Next lesson.} Deeper LLN/CLT intuition, dependence and effective sample
+size, and why more data can make a biased evaluation more precise without making
+it more relevant.
+\newpage
+
+\subsection{Retrieval answer key and compact formula sheet}
+\begin{enumerate}[label=\textbf{\arabic*.},itemsep=6pt]
+\item A statistic is a function of sampled data; its sampling distribution is
+its distribution across repeated samples; its standard error is its standard
+deviation. For fixed-model evaluation, hold the fitted prediction rule fixed
+and vary the fresh test observations.
+\item $\E[\bar X]=\mu$ by linearity. In general,
+$\Var(\bar X)=n^{-2}\sum_{i,j}\Cov(X_i,X_j)$.
+With pairwise zero covariances and equal variances this is $\sigma^2/n$.
+\item Multiply $n$ by 9.
+\item LLN: the average approaches its population mean in probability under
+the stated assumptions. CLT: its centered, $\sqrt n$-scaled fluctuations
+converge in distribution to a normal law. LLN gives consistency; CLT supports
+approximate uncertainty calculations.
+\item Mean 900; variance $40{,}000/400=100$; standard error 10.
+\item MSE is an average of losses, so expectation is preserved. The square
+root is nonlinear and concave, so $\E[\sqrt{\bar L}]\leq\sqrt{\E[\bar L]}$.
+\item $\Var(D_i)=400+500-700=200$; $\SE(\bar D)=\sqrt{200/100}=\sqrt2$.
+\item $z=-2.1213$; two-sided interval $(-5.772,-0.228)$; one-sided upper
+bound $-0.674$. The two-sided test asks whether $\Delta\neq0$; the lower-tail
+test asks whether $\Delta<0$ against the composite null $\Delta\geq0$.
+\item Choosing the observed direction creates a rejection region comprising
+both 5\% tails: total Type I error 10\%, not the claimed 5\%.
+\item $\Cov(L_{A,i},L_{B,i})$ enters $\Var(D_i)$ with coefficient $-2$.
+$\Cov(D_i,D_j)$ enters the variance of the average with a positive coefficient.
+They are different covariances, so there is no contradiction.
+\item $n_{\mathrm{eff}}=100/[1+9(0.2)]\approx35.7$. Group-held-out validation
+targets new neighborhoods; validation for familiar neighborhoods should match
+that different deployment setting.
+\end{enumerate}
+\vspace{3pt}\hrule\vspace{5pt}
+\textbf{Formula sheet (under the stated assumptions)}
+\begin{align*}
+\SE(\bar X)&=\sigma/\sqrt n,
+&\widehat{\SE}(\bar X)&=s/\sqrt n,\\
+\Var(A-B)&=\Var(A)+\Var(B)-2\Cov(A,B),\\
+Z&=(\widehat\theta-\theta_0)/\SE(\widehat\theta),
+&\mathrm{CI}_{95\%}&:\ \widehat\theta\pm1.96\SE(\widehat\theta),\\
+p_{\mathrm{two}}&=2\Phi(-|Z|),
+&p_{\mathrm{lower}}&=\Phi(Z).
+\end{align*}
+\textbf{Always check:} target population; fixed versus refitted model; independence
+or clustering; finite moments; untouched evaluation data; prespecified test
+direction; practical effect size.
+\end{document}
