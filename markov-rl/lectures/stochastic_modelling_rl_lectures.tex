@@ -1,0 +1,1243 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,booktabs,fancyhdr,microtype,hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,pdftitle={Stochastic Modelling and Reinforcement Learning: Lecture Notes},pdfauthor={Prepared for Sean Rogers}}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+\theoremstyle{remark}\newtheorem{remark}[definition]{Remark}
+\newcommand{\E}{\mathbb E}\newcommand{\Prob}{\mathbb P}
+\pagestyle{fancy}\fancyhf{}\fancyhead[L]{\small Stochastic Modelling \& Reinforcement Learning}\fancyhead[R]{\small Lesson 1}\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+\setlength{\parskip}{5pt}\setlength{\parindent}{0pt}
+\begin{document}
+\begin{center}
+{\LARGE\bfseries Stochastic Modelling\\[4pt]and Reinforcement Learning}\par
+\vspace{8pt}{\large Cumulative lecture notes}\par
+\vspace{4pt}Prepared for Sean Rogers\par
+{\small Lessons 1--4; updated October 12, 2026}
+\end{center}
+\vspace{6pt}
+{\small\setlength{\parskip}{0pt}\tableofcontents}
+\clearpage
+\section{Lesson 1: States, policies, and Bellman recursion}
+\textbf{Scope.} States, policies, finite-horizon values, and Bellman recursion, with definitions, proofs, and worked examples.
+
+\subsection{Stochastic processes and the Markov property}
+\begin{definition}[Stochastic process]
+A stochastic process is a family of random variables $(X_t)_{t\in T}$ on a common probability space, taking values in a state space $\mathcal S$. Here $T=\{0,1,2,\ldots\}$ and the state space is countable unless otherwise stated. A realized sequence $(x_0,x_1,\ldots)$ is a sample path.
+\end{definition}
+\begin{definition}[Markov property]
+A process is Markov if, at every fixed time $t$, the conditional distribution of the next state given the entire past equals that given the current state:
+\begin{equation}
+\Prob(X_{t+1}=y\mid X_0,\ldots,X_t)
+=\Prob(X_{t+1}=y\mid X_t)\quad\text{almost surely}.
+\end{equation}
+Thus the current state summarizes the predictive information in the past, with the time index understood as known.
+\end{definition}
+This is conditional independence, not independence of successive states. Earlier history can influence the present, and the present can strongly influence the future. Conditional probabilities on events of probability zero require a choice of version; all elementary calculations below concern reachable states.
+
+\newpage
+\subsection{Time-homogeneity and the role of the clock}
+Write the transition probabilities as
+\[
+P_t(x,y)=\Prob(X_{t+1}=y\mid X_t=x).
+\]
+\begin{definition}[Time-homogeneous Markov chain]
+A Markov chain is time-homogeneous if there is one transition matrix $P$ such that $P_t=P$ for every $t$. Its entries are nonnegative and each row sums to one.
+\end{definition}
+\textbf{Worked example.} Suppose a multiplier increases by one with probability $p_t(m)$ and otherwise stays at $m$. If $p_t(m)=0.2$ for $t<5$ and $p_t(m)=0.5$ for $t\geq5$, the process is Markov but time-inhomogeneous, provided earlier history has no further influence. At a fixed $t$, the current multiplier determines the next-state distribution. Across different times, the transition rule changes.
+
+A probability $p(m)$ that depends on the current multiplier but not on $t$ gives a time-homogeneous rule. Dependence on the state is entirely compatible with time-homogeneity.
+\begin{proposition}[Including time in the state]
+If $(X_t)$ is a time-inhomogeneous Markov chain, then $Y_t=(X_t,t)$ has a time-homogeneous Markov representation on $\mathcal S\times\mathbb N_0$ with kernel
+\[
+K((x,k),(y,\ell))=\mathbf1_{\{\ell=k+1\}}P_k(x,y).
+\]
+\end{proposition}
+\begin{proof}
+Given $Y_t=(x,k)$, the next clock coordinate is $k+1$ and the next physical state has distribution $P_k(x,\cdot)$. This is one fixed rule on the expanded state space, requiring no additional external time argument. The Markov property follows from that of $X_t$.
+\end{proof}
+This encodes the time dependence; it does not remove it from the physical system. The clock coordinate increases, so the expanded process never revisits the same state.
+
+\subsection{Horizon, remaining return, and state sufficiency}
+\begin{definition}[Horizon and return]
+The horizon is the number of decision steps over which rewards are accumulated. For a fixed terminal time $T$, the remaining horizon at time $t$ is $T-t$. If $R_{t+1}$ is the reward from the next step, the undiscounted remaining return is
+\[
+G_t=\sum_{k=t+1}^{T}R_k.
+\]
+An infinite horizon has no fixed last step; a random horizon ends at a random time. Convergence assumptions are needed for infinite sums.
+\end{definition}
+\textbf{Worked example.} A ten-spin bonus has multiplier $M_t$ after $t$ completed spins. Thus $M_0$ is the starting multiplier. A multiplier of $5$ with eight spins left generally has a different remaining value from the same multiplier with one spin left.
+
+\textbf{State and horizon.} This does not prove that $(M_t)$ is non-Markov. We can keep $M_t$ and write a time-indexed value $V_t(m)$, or use the augmented state $(M_t,T-t)$ and write $V(m,n)$. Both retain the horizon information needed for valuation. Adding time alone does not fix arbitrary history dependence: if transitions depend on an earlier event not recoverable from the current state and time, that information must also be retained.
+
+\newpage
+\subsection{From a Markov chain to a decision process}
+\begin{definition}[Finite-horizon Markov decision process]
+An MDP specifies a state space $\mathcal S$, available actions $\mathcal A(s)$, a transition law $P(s'\mid s,a)$, and rewards. For expected-return calculations, we may use the expected immediate reward $r(s,a)$. The horizon, terminal payoff, and optimization objective complete the decision problem. Given the current state and chosen action, the next-state and reward law has no additional dependence on earlier history.
+\end{definition}
+If reward and next state are correlated, their joint conditional law can be specified. Linearity of expectation still permits the Bellman form using $r(s,a)$ and the next-state marginal. Our example has deterministic immediate rewards and zero terminal payoff.
+
+\begin{definition}[Policy]
+A deterministic Markov policy selects an action from the current state, $a=\pi(s)$. A randomized Markov policy specifies probabilities $\pi(a\mid s)$. With time excluded from the state, finite-horizon policies may be indexed by time, $\pi_t(a\mid s)$. More general policies may depend on the observed history.
+\end{definition}
+A policy gives a contingent decision rule, not merely a fixed action sequence. After different random outcomes, it can choose different actions. A fixed Markov policy induces a Markov state process; arbitrary history-dependent policies need not do so on the original state space.
+
+\textbf{The Collect/Build model.} Let $s=(m,n)$, where $m\in\{1,2,\ldots\}$ is the multiplier and $n\in\{0,\ldots,N\}$ is the remaining number of spins. For $n>0$:
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Action & Immediate reward & Next state\\
+\midrule
+Collect & $m$ & $(m,n-1)$ with probability $1$\\
+Build & $0$ & $(m+1,n-1)$ with probability $p$\\
+ & & $(m,n-1)$ with probability $1-p$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Both actions consume exactly one spin. At $n=0$, play ends and no additional payout is received. Initially we use $p=1/2$. The objective is to maximize expected total payout, with no discounting.
+
+\subsection{Policy values and optimal values}
+\begin{definition}[Value functions]
+The value $V^\pi(m,n)$ is the expected remaining total payout starting from $(m,n)$ and following policy $\pi$. The optimal value is
+\[
+V^*(m,n)=\sup_\pi V^\pi(m,n).
+\]
+For this finite-horizon, finite-action model the supremum is attained. Write $V=V^*$ when the optimality convention is clear.
+\end{definition}
+For the always-Collect policy $\pi_C$, the multiplier stays fixed, so
+\[
+V^{\pi_C}(m,n)=mn.
+\]
+Value is already measured in dollars and accounts for the multiplier. Writing $mV$ in place of the future value would impose an unproved scaling relation and generally double-count the multiplier.
+
+\newpage
+\subsection{The Bellman optimality equation}
+\begin{theorem}[Bellman recursion for Collect/Build]
+The optimal value satisfies $V^*(m,0)=0$ and, for $n\geq1$,
+\begin{equation}
+\boxed{V^*(m,n)=\max\left\{
+\begin{aligned}
+&m+V^*(m,n-1),\\
+&(1-p)V^*(m,n-1)+pV^*(m+1,n-1)
+\end{aligned}\right\}.}
+\end{equation}
+An optimal policy chooses any action attaining this maximum at each state.
+\end{theorem}
+\begin{proof}
+At $n=0$ there are no rewards left. Suppose the optimal values and attaining policies are available with $n-1$ spins remaining. Collect yields $m$ immediately and leaves $(m,n-1)$. Build yields zero and leaves one of two states; conditioning on that outcome gives the second expression. No continuation can exceed the corresponding optimal next-state value. Conversely, choosing an action attaining the maximum and then an optimal continuation achieves the displayed value. Induction proves the result for all finite $n$.
+\end{proof}
+\textbf{Principle of optimality.} An optimal continuation must be optimal at every next state reached with positive probability under the chosen action; otherwise it can be replaced to improve the initial expected return. Actions at unreachable states do not affect that initial return.
+
+The general finite-state version, with $n$ steps left and zero terminal payoff, is
+\[
+V_n^*(s)=\max_{a\in\mathcal A(s)}
+\left[r(s,a)+\sum_{s'}P(s'\mid s,a)V_{n-1}^*(s')\right].
+\]
+We \emph{maximize} over actions we choose and \emph{average} over outcomes we do not control. The conditional expectation of future value is taken after allowing future actions to respond to the realized next state.
+
+\textbf{Backward induction} computes the terminal values first, then the values with one step remaining, two steps remaining, and so forth. This is dynamic programming: repeated subproblems are solved once and reused.
+
+\subsection{Worked examples: one and two spins}
+\textbf{Example 1: $(m,n)=(3,1)$.} Collect pays $3$ and then terminates. Build pays zero and then terminates. A larger terminal multiplier has no value because there is no terminal payoff. Hence $V^*(3,1)=3$. Generally, $V^*(m,1)=m$ for $m\geq1$.
+
+\textbf{Example 2: $(3,2)$ with $p=1/2$.}
+\[
+Q_C=3+V^*(3,1)=6,\qquad
+Q_B=\tfrac12 V^*(3,1)+\tfrac12 V^*(4,1)=3.5.
+\]
+Thus Collect is optimal and $V^*(3,2)=6$. Here $Q_C,Q_B$ denote expected return from the indicated first action followed by optimal decisions.
+
+\newpage
+\subsection{Worked examples: solving through four spins}
+Throughout this subsection, $p=1/2$ and $m$ is a positive integer.
+
+\textbf{Two spins.} Substitution of $V^*(m,1)=m$ gives
+\[
+V^*(m,2)=\max\{2m,m+\tfrac12\}=2m.
+\]
+Collect is preferred when $m\geq1/2$, and is strictly preferred for every allowed $m\geq1$. The equality at $1/2$ would matter only in a model allowing that state.
+
+\textbf{Three spins.} Both possible next multipliers are at least one, so the two-spin formula applies to both:
+\[
+V^*(m,3)=\max\{m+2m,\tfrac12(2m)+\tfrac12[2(m+1)]\}
+=\max\{3m,2m+1\}=3m.
+\]
+At $m=1$ the actions tie; at $m>1$ Collect is strictly better. An optimal value is unique as a number, while an optimal action or policy need not be unique.
+
+\textbf{Four spins.} Similarly,
+\[
+V^*(m,4)=\max\{4m,3m+\tfrac32\}.
+\]
+Collect is at least as good when $m\geq3/2$. For integer multipliers this gives
+\[
+V^*(m,4)=
+\begin{cases}
+4.5,&m=1\quad\text{(Build)},\\
+4m,&m\geq2\quad\text{(Collect)}.
+\end{cases}
+\]
+\textbf{Direct comparison at $(1,4)$.} Always collecting yields exactly $4$. Building once and then collecting three times yields $3$ if Build fails and $6$ if it succeeds:
+\[
+\E[G]=\tfrac12(3)+\tfrac12(6)=4.5.
+\]
+This comparison alone only ranks two plans. The backward-induction calculation establishes that $4.5$ is optimal over \emph{all} policies. Following the first Build, always collecting is optimal in either next state, although at $(1,3)$ it is not the only optimal choice.
+
+\begin{center}
+\begin{tabular}{@{}cll@{}}
+\toprule
+Spins remaining & Optimal value, $m\geq1$ integer & Optimal action\\
+\midrule
+0 & $0$ & None\\
+1 & $m$ & Collect\\
+2 & $2m$ & Collect\\
+3 & $3m$ & Either if $m=1$; otherwise Collect\\
+4 & $\max\{4m,3m+1.5\}$ & Build if $m=1$; otherwise Collect\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\newpage
+\subsection{Marginal value and one-step deviations}
+Return now to general $p\in[0,1]$. Subtracting the optimal-continuation value of Collect from that of Build gives
+\[
+Q_B^*(m,n)-Q_C^*(m,n)
+=p\big[V^*(m+1,n-1)-V^*(m,n-1)\big]-m.
+\]
+Thus Build is strictly better exactly when
+\begin{equation}
+\boxed{p\big[V^*(m+1,n-1)-V^*(m,n-1)\big]>m.}
+\end{equation}
+The bracketed difference is the \emph{marginal future value} of an extra multiplier unit. The right-hand side is the immediate payout forgone by building. Equality means the two first actions tie when followed by optimal play.
+
+\begin{proposition}[Build once versus always Collect]
+With $n\geq1$ spins remaining, building now and collecting on every later spin beats collecting on every spin if and only if
+\[
+p(n-1)>m.
+\]
+\end{proposition}
+\begin{proof}
+Always Collect yields $mn$. Build once then Collect yields
+\[
+(1-p)m(n-1)+p(m+1)(n-1)=(n-1)(m+p).
+\]
+The difference is $p(n-1)-m$, proving the claim.
+\end{proof}
+This substitutes the \emph{fixed-policy} continuation $V^{\pi_C}(m,n-1)=m(n-1)$, rather than the optimal continuation, into an action comparison. It does not by itself prove that building exactly once is optimal: later Build decisions may improve the outcome further.
+
+\textbf{Relative versus absolute improvement.} A successful Build changes $m$ to $m+1$, a growth factor $(m+1)/m=1+1/m$ and percentage increase $100/m\%$. For the expected-dollar objective, the direct explanation is that the forgone reward grows with $m$, while each subsequent collection gains just one dollar on success. With three subsequent collections and $p=1/2$, the expected gain is $1.5$ and the cost is $m$.
+
+\subsection{Planning, learning, and modelling}
+Given rewards and transition probabilities define a \emph{planning} problem with a known model. Reinforcement learning often obtains a policy or value estimates from sampled interactions when that model is unknown. Model-based RL can estimate a model and then plan with it; model-free methods can learn values or policies directly.
+
+The broader stochastic-modelling questions remain useful even without actions: how distributions evolve, when a process reaches a target, whether long-run behavior stabilizes, and whether the assumed model fits observed data.
+
+\newpage
+\subsection{Recall exercises and solutions}
+Attempt these without looking back.
+\begin{enumerate}
+\item Can a Markov process have transition probabilities that depend on time? Explain precisely.
+\item In a ten-spin bonus, does needing the number of remaining spins for valuation prove the multiplier process is non-Markov?
+\item State the terminal condition and Bellman recursion for Collect/Build with success probability $p$.
+\item For $p=1/2$, find $V^*(1,3)$ and $V^*(1,4)$, including all optimal first actions.
+\item For $p=0.4$, $m=2$, and $n=7$, compare always Collect with Build once then Collect. What does this comparison establish?
+\item What distinguishes $V^\pi$ from $V^*$? Why can policies depend on random outcomes?
+\end{enumerate}
+\textbf{Solutions.}
+\begin{enumerate}
+\item Yes. At each fixed time $t$, earlier history adds no information after conditioning on $X_t$. The kernel $P_t$ may change with $t$. Time-homogeneity adds the requirement that the kernels are identical.
+\item No. One may use $V_t(m)$ while retaining $m$ as the physical state, or include the remaining time and use $V(m,n)$. Markovity concerns conditional transition laws; remaining value also depends on the horizon and reward specification.
+\item $V^*(m,0)=0$ and
+\[
+V^*(m,n)=\max\{m+V^*(m,n-1),\ (1-p)V^*(m,n-1)+pV^*(m+1,n-1)\}.
+\]
+\item $V^*(1,3)=3$, and either first action is optimal. $V^*(1,4)=4.5$, with Build uniquely optimal as the first action.
+\item Always Collect gives $14$. Build once then Collect gives $6(2+0.4)=14.4$. Equivalently, $0.4(6)>2$. The second specified plan is better by $0.4$; this does not establish the overall optimal policy or value.
+\item $V^\pi$ evaluates a specified policy; $V^*$ optimizes over policies. A policy selects actions from observed states (and time when necessary), so different observed next states may lead to different choices.
+\end{enumerate}
+
+
+% APPEND FUTURE LESSONS HERE, BEFORE end{document}.
+\clearpage
+\fancyhead[R]{\small Lesson 2}
+\section{Lesson 2: Transition matrices and policy evaluation}
+\textbf{Scope.} Transition matrices, distribution and value operations, stationary distributions, convergence, periodicity, and the Markov chain induced by a policy.
+
+\subsection{Transition matrices and multi-step probabilities}
+\begin{definition}[Transition matrix]
+For a finite, time-homogeneous Markov chain on $\{1,\ldots,d\}$, define
+\[
+P_{ij}=\Prob(X_{t+1}=j\mid X_t=i).
+\]
+Rows index current states and columns index next states. A row-stochastic matrix satisfies $P_{ij}\geq0$ and $\sum_jP_{ij}=1$ for every $i$.
+\end{definition}
+Throughout the basic machine example, the state order is Working ($W$), Broken ($B$), and observations occur each morning:
+\[
+P=\begin{pmatrix}0.8&0.2\\0.6&0.4\end{pmatrix}.
+\]
+A Working machine is Broken the next morning with probability $0.2$; a Broken machine is Working the next morning with probability $0.6$. This assumes that age, earlier failures, and other historical information do not affect next-state probabilities once the current state is known.
+
+\begin{theorem}[Chapman--Kolmogorov and matrix powers]
+For nonnegative integers $r,s$,
+\[
+(P^{r+s})_{ij}=\sum_k(P^r)_{ik}(P^s)_{kj},\qquad
+(P^n)_{ij}=\Prob(X_{t+n}=j\mid X_t=i).
+\]
+Here $P^0=I$.
+\end{theorem}
+\begin{proof}
+Condition on the state $k$ after $r$ steps. The Markov property removes dependence on the earlier path, and time-homogeneity makes the remaining $s$-step law independent of the starting time. Summing over $k$ gives matrix multiplication. Induction starting from $n=1$ proves the interpretation of $P^n$.
+\end{proof}
+\textbf{Worked calculation.} Starting Working on Monday, the two paths to Working on Wednesday are $W\to W\to W$ and $W\to B\to W$:
+\[
+(P^2)_{WW}=0.8(0.8)+0.2(0.6)=0.64+0.12=0.76.
+\]
+Starting Broken gives $B\to W\to W$ and $B\to B\to W$:
+\[
+(P^2)_{BW}=0.6(0.8)+0.4(0.6)=0.72,
+\qquad P^2=\begin{pmatrix}0.76&0.24\\0.72&0.28\end{pmatrix}.
+\]
+\textbf{Time-inhomogeneous version.} If the one-step matrix at time $t$ is $P_t$, the $n$-step matrix is $P_tP_{t+1}\cdots P_{t+n-1}$, rather than a power of one fixed matrix.
+
+\clearpage
+\subsection{Distributions, values, and the two sides of multiplication}
+\begin{definition}[State distribution]
+The row vector $\mu_t$ has entries $\mu_t(i)=\Prob(X_t=i)$. It describes uncertainty about the state; the realized machine itself occupies one state.
+\end{definition}
+By total probability,
+\[
+\mu_{t+1}(j)=\sum_i\mu_t(i)P_{ij},\qquad
+\boxed{\mu_{t+1}=\mu_tP,\quad\mu_t=\mu_0P^t.}
+\]
+For $\mu_0=(0.5,0.5)$, the next distribution is $(0.7,0.3)$.
+
+Represent a function on states as a \emph{column} vector, for example
+\[
+v=\begin{pmatrix}10\\0\end{pmatrix}.
+\]
+Then the scalar $\mu v$ is its expectation under distribution $\mu$, whereas
+\[
+(Pv)_i=\sum_jP_{ij}v_j=\E[v(X_1)\mid X_0=i]
+\]
+is its expected next-state value for each possible starting state. Numerically,
+\[
+\mu_0v=5,\qquad Pv=\begin{pmatrix}8\\6\end{pmatrix}.
+\]
+The entries $8$ and $6$ are dollar values, not probabilities. Associativity expresses the law of total expectation:
+\[
+\underbrace{(\mu_0P)v}_{\text{average using tomorrow's distribution}}
+=\underbrace{\mu_0(Pv)}_{\text{average conditional expectations}}
+=0.7(10)+0.3(0)=0.5(8)+0.5(6)=7.
+\]
+
+\subsection{Accumulating rewards over a finite horizon}
+Suppose each day beginning Working earns $10$ dollars and each day beginning Broken earns zero. Set $r=(10,0)^{\mathsf T}$. This illustrative reward convention has no repair costs; later examples explicitly change it.
+
+Define $V_n(i)$ as expected total reward on days indexed $0,\ldots,n-1$, conditional on $X_0=i$. Then
+\[
+V_0=0,\qquad V_n=r+PV_{n-1},\qquad
+\boxed{V_n=\sum_{k=0}^{n-1}P^kr.}
+\]
+For example, $V_2=r+Pr=(18,6)^{\mathsf T}$ and $\mu_0V_2=12$.
+The first day contributes $\mu_0r=5$; the second contributes $\mu_0Pr=7$.
+In particular, $\mu Pr$ counts \emph{only} the reward at the state after one transition; it does not include the initial reward.
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}\toprule
+Expression & Shape & Meaning\\\midrule
+$\mu P$ & $1\times d$ & Next-state distribution\\
+$\mu v$ & Scalar & Expected value under $\mu$\\
+$Pv$ & $d\times1$ & Expected next-state value for each start\\
+$P^n$ & $d\times d$ & $n$-step transition probabilities\\
+$\mu P^kr$ & Scalar & Expected reward at time $k$\\
+$\mu V_n$ & Scalar & Expected total over $n$ reward times\\\bottomrule
+\end{tabular}\end{center}
+
+\clearpage
+\subsection{Stationary distributions and convergence}
+\begin{definition}[Stationary distribution]
+A probability row vector $d$ is stationary if $dP=d$. Starting with this distribution preserves it at all times. Individual sample paths can still change state.
+\end{definition}
+The notation $d$ denotes a stationary distribution; $\pi$ is reserved for a policy.
+
+\textbf{Worked example.} Write $d=(q,1-q)$. The Working coordinate requires
+\[
+q=0.8q+0.6(1-q),\quad 0.8q=0.6,\quad d=(0.75,0.25).
+\]
+At this distribution, the flows between the two states balance:
+\[
+0.75(0.2)=0.25(0.6)=0.15.
+\]
+This pairwise balance is useful for this two-state example; general stationary chains need not balance every pair separately.
+
+Stationarity alone does not imply convergence from other initial distributions. For this particular chain, let $q_t=\Prob(X_t=W)$. Then
+\[
+q_{t+1}=0.6+0.2q_t.
+\]
+Subtracting the fixed-point identity $0.75=0.6+0.2(0.75)$ gives
+\[
+q_{t+1}-0.75=0.2(q_t-0.75).
+\]
+Thus the deviation $e_t=q_t-0.75$ satisfies $e_{t+1}=0.2e_t$, and
+\[
+\boxed{q_t=0.75+0.2^t(q_0-0.75)\longrightarrow0.75.}
+\]
+Subtracting the fixed point eliminates the constant term and exposes the contraction. Starting at $q_0=0.5$, the successive probabilities are $0.5,0.7,0.74,0.748,\ldots$.
+
+\textbf{Counterexample: a stationary distribution without convergence.}
+For the alternating chain
+\[
+P=\begin{pmatrix}0&1\\1&0\end{pmatrix},
+\]
+the stationary distribution is $(1/2,1/2)$. But $q_{t+1}=1-q_t$, so with $e_t=q_t-1/2$,
+\[
+e_{t+1}=-e_t,\qquad e_t=(-1)^te_0.
+\]
+The deviation never shrinks. Starting Working gives alternating distributions:
+\[ (1,0),\ (0,1),\ (1,0),\ldots. \] The distribution converges only when it starts stationary.
+
+\begin{definition}[Irreducibility]
+A chain is irreducible if every state can reach every other state with positive probability in a finite number of steps.
+\end{definition}
+Both our original chain and the alternating chain are irreducible. A further condition will distinguish their convergence behavior.
+
+\clearpage
+\subsection{Periodicity: return times and their arithmetic}
+\begin{definition}[Period]
+For a state $i$ with a nonempty set of positive return times, define
+\[
+R_i=\{n\geq1:(P^n)_{ii}>0\},\qquad d(i)=\gcd R_i.
+\]
+The state is aperiodic if $d(i)=1$, and periodic if $d(i)>1$.
+\end{definition}
+The period describes a rigid rhythm in possible returns. With period two, every return time is even. With period three, every return time is a multiple of three. Early multiples may still be absent.
+
+\textbf{Period is not the minimum return time.} Consider
+\[
+P=\begin{pmatrix}0&1&0\\1/2&0&1/2\\1&0&0\end{pmatrix}.
+\]
+State $1$ has return paths $1\to2\to1$ and $1\to2\to3\to1$, of lengths two and three. Its shortest return is two, but its period is one. A self-loop is sufficient for aperiodicity, since it puts $1$ in $R_i$, but is not necessary.
+
+\begin{proposition}[Equivalent characterization of aperiodicity]
+A state with nonempty $R_i$ has period one if and only if there is an integer $N$ such that $(P^m)_{ii}>0$ for every integer $m>N$.
+\end{proposition}
+\begin{proof}
+If all sufficiently large integers occur, two consecutive ones occur, forcing gcd one. Conversely, concatenation of return paths shows that $R_i$ is closed under addition. Choose finitely many return times $a_1,\ldots,a_k$ with gcd one (successive gcds stabilize). Put $a=a_1$. Their residues generate all of $\mathbb Z/a\mathbb Z$; nonnegative combinations also generate this finite group, since inverses can be expressed by repeated addition. Choose a nonnegative combination $b_r$ in each residue class $r$. For $n\geq\max_r b_r$, choose $r\equiv n\pmod a$ and write $n=b_r+qa$ with $q\geq0$. These combinations concatenate return paths, so every sufficiently large positive $n$ belongs to $R_i$.
+\end{proof}
+\textbf{Concrete arithmetic.} If lengths two and five are possible, every $n\geq4$ is $2a+5b$ for nonnegative integers $a,b$: use $b=0$ for even $n$, and $b=1$ for odd $n\geq5$. The gcd condition alone is not enough for an arbitrary set; closure under addition is essential here.
+
+\begin{theorem}[Finite-state convergence theorem]
+A finite irreducible Markov chain has a unique stationary distribution. If it is also aperiodic, then $\mu P^t\to d$ for every initial distribution $\mu$.
+\end{theorem}
+\textit{Proof outline.} For a finite irreducible aperiodic chain, some power $P^N$ has every entry positive. A common positive mass in all its rows yields a strict contraction of distributions in total variation, implying convergence to the unique invariant distribution. Existence and uniqueness under irreducibility alone follow from the finite-state invariant-vector theorem. A full proof is deferred; the two-state examples above establish their convergence directly.
+
+The original machine is irreducible and has positive diagonal entries, hence is aperiodic. The alternating chain has period two: it has a unique stationary distribution, but need not converge to it.
+
+\clearpage
+\subsection{How a policy induces a Markov chain}
+In a time-homogeneous MDP, write the controlled transition law as $P(s'\mid s,a)$ and the expected immediate reward as $r(s,a)$. A stationary randomized Markov policy $\pi(a\mid s)$ chooses actions using only the current state, with no additional dependence on time or history.
+\begin{proposition}[Induced transition and reward]
+Under such a policy, the state process is a time-homogeneous Markov chain with
+\[
+\boxed{P^\pi_{ss'}=\sum_a\pi(a\mid s)P(s'\mid s,a),\qquad
+r^\pi(s)=\sum_a\pi(a\mid s)r(s,a).}
+\]
+\end{proposition}
+\begin{proof}
+Condition on the action and sum over its possible values. The policy and controlled transition law depend only on the current state, so earlier history supplies no further information. The reward identity follows by conditional expectation.
+\end{proof}
+\textbf{Worked randomized repair policy.} When Broken, choose Standard with probability $0.75$ and Intensive with probability $0.25$. Their repair-success probabilities are $0.6$ and $0.9$, and their costs are $10$ and $30$ dollars. Therefore
+\[
+P^\pi_{BW}=0.75(0.6)+0.25(0.9)=0.675,\qquad
+r^\pi(B)=0.75(-10)+0.25(-30)=-15.
+\]
+Keeping the original Working transitions and using the $20$-dollar Working-day income from this part of the lesson gives
+\[
+P^\pi=\begin{pmatrix}0.8&0.2\\0.675&0.325\end{pmatrix},\qquad
+r^\pi=\begin{pmatrix}20\\-15\end{pmatrix}.
+\]
+
+\subsection{Bellman expectation equation and matrix evaluation}
+\begin{theorem}[Finite-horizon policy evaluation]
+Under a fixed stationary policy, with zero terminal payoff and rewards at times $0,\ldots,n-1$,
+\[
+V_0^\pi=0,\qquad
+V_n^\pi=r^\pi+P^\pi V_{n-1}^\pi
+=\sum_{k=0}^{n-1}(P^\pi)^kr^\pi.
+\]
+For initial distribution $\mu$, expected total reward is $\mu V_n^\pi$.
+\end{theorem}
+\begin{proof}
+Separate the first reward from the remaining return and condition on the next state. This gives the recursion. Repeated substitution, or induction on $n$, gives the sum. Averaging over the initial state gives the final claim.
+\end{proof}
+There is no maximization: this evaluates the specified policy. The optimality equation from Lesson 1 instead maximizes over the first action and uses optimal continuation values.
+
+\textbf{Worked two-day value starting Broken.}
+\[
+V_2^\pi(B)=-15+0.675(20)+0.325(-15)=-6.375.
+\]
+A negative expected return is permissible: repair costs can exceed income over a short horizon. Expected immediate reward and next state need not be independent for the Bellman equation; linearity of expectation suffices.
+
+\clearpage
+\subsection{History-dependent repair and expanded states}
+Now change the policy: choose Standard on the first Broken morning of a run, and Intensive on every subsequent consecutive Broken morning. With only $W,B$, the next-state law depends on the previous status as well as the current status. The process can be described as second-order Markov, or as first-order Markov on an expanded state space. ``Second-order'' is distinct from the two-step matrix $P^2$.
+
+Use states $W,B_1,B_{2+}$, where $B_1$ denotes the first Broken morning in a run and $B_{2+}$ denotes at least two consecutive Broken mornings. An initial run category must be specified when the process starts Broken.
+\[
+P^\pi=\begin{pmatrix}
+0.8&0.2&0\\
+0.6&0&0.4\\
+0.9&0&0.1
+\end{pmatrix}.
+\]
+The policy chooses Standard in the second row and Intensive in the third. A failed repair in $B_{2+}$ extends the run; it cannot create a new first Broken morning. A new run requires an intervening Working morning.
+
+\textbf{Why aggregate $B_2,B_3,\ldots$?} They have identical actions, rewards, and probabilities of moving into the aggregate states. Exact run length therefore gives no additional predictive information. Identical actions alone would not suffice if repair success or costs also depended on run length.
+
+For consistency with the final matrix tutorial, this example uses Working-day income of $10$ dollars (rather than the preceding example's $20$), with the same repair costs:
+\[
+r^\pi=\begin{pmatrix}10\\-10\\-30\end{pmatrix}.
+\]
+Suppose we start in $B_1$, so $\mu=(0,1,0)$. Then
+\[
+\mu P^\pi=(0.6,0,0.4),\qquad
+\mu P^\pi r^\pi=0.6(10)+0.4(-30)=-6.
+\]
+This is the reward after one step. The $-30$ term automatically applies the Intensive-repair policy if tomorrow's state is $B_{2+}$. Including today's Standard repair gives
+\[
+\boxed{\mu V_2^\pi=\mu r^\pi+\mu P^\pi r^\pi=-10-6=-16.}
+\]
+One may also compute values for every initial state simultaneously:
+\[
+P^\pi r^\pi=\begin{pmatrix}6\\-6\\6\end{pmatrix},\qquad
+V_2^\pi=r^\pi+P^\pi r^\pi=\begin{pmatrix}16\\-16\\-24\end{pmatrix}.
+\]
+The familiar matrix operations have not changed. The policy enters through the chosen state description, the rows of $P^\pi$, and the entries of $r^\pi$.
+
+\clearpage
+\subsection{Review exercises and worked solutions}
+\begin{enumerate}
+\item For the original two-state matrix and $\mu=(0.5,0.5)$, compute $\mu P^2$. With $r=(10,0)^{\mathsf T}$, compute $\mu P^2r$ and $\mu V_3$.
+\item Explain the difference between $\mu P$, $Pr$, and $\mu Pr$, including their shapes.
+\item Does a stationary distribution guarantee convergence from every initial state? Give a counterexample and its deviation recurrence.
+\item Can an aperiodic state have no self-loop? Use return paths of lengths two and five to justify your answer.
+\item Why is $\mu Pr$ not the expected total reward over two days?
+\item Under the expanded repair policy, start in $B_{2+}$. Compute the expected two-day total and explain each term.
+\item If Intensive repair success depends on the exact number of consecutive Broken mornings, is $B_{2+}$ still a sufficient state summary?
+\end{enumerate}
+\textbf{Solutions.}
+\begin{enumerate}
+\item $\mu P^2=(0.74,0.26)$, so $\mu P^2r=7.4$. The three-day total is $\mu V_3=5+7+7.4=19.4$. The $7.4$ is only the third day's contribution.
+\item $\mu P$ is a probability row vector for the next state. $Pr$ is a value column vector, with one expected next reward for each current state. $\mu Pr$ is a scalar averaging these values over the initial distribution.
+\item No. For deterministic alternation, $(1/2,1/2)$ is stationary but $e_{t+1}=-e_t$. Unless $e_0=0$, the distribution oscillates instead of converging.
+\item Yes. The return lengths have gcd one. Every integer $n\geq4$ is $2a+5b$ with $a,b\geq0$, giving a concatenated return path even without a one-step return.
+\item It omits the reward at the initial state. The two-day total is $\mu r+\mu Pr$ under our reward-timing convention.
+\item $-30+0.9(10)+0.1(-30)=-24$. Today's Intensive repair costs $30$; tomorrow begins Working with probability $0.9$, otherwise another Intensive repair is used.
+\item Generally no. The aggregated histories would have different next-state laws. Retain exact run length or another summary sufficient to determine those laws.
+\end{enumerate}
+
+
+
+\clearpage
+\fancyhead[R]{\small Lesson 3}
+\section{Lesson 3: Hitting times, absorption, and stopping times}
+\textbf{Scope.} This lesson connects first-step equations to expected waiting times, occupation counts, repair costs, and optimal decisions. The final sections develop the filtration and strong Markov concepts used to interpret hitting probabilities.
+
+\subsection{Hitting times and first-step analysis}
+\begin{definition}[Hitting time]
+For a target set $A$, its first hitting time is
+\[
+T_A=\inf\{n\geq0:X_n\in A\},\qquad \inf\varnothing=\infty.
+\]
+If $X_0\in A$, then $T_A=0$. Later departures from $A$ do not change this first-arrival time. A positive return time instead restricts the infimum to $n\geq1$.
+\end{definition}
+For example, the path $B,B,B,W,B,\ldots$ first hits $W$ at time three. Write $\E_i$ for expectation conditional on $X_0=i$ and set $h(i)=\E_i[T_A]$.
+\begin{proposition}[First-step equations]
+For a time-homogeneous Markov chain,
+\[
+h(i)=0\ (i\in A),\qquad h(i)=1+\sum_jP_{ij}h(j)\ (i\notin A).
+\]
+These identities hold for nonnegative extended expectations; algebraic subtraction requires finiteness.
+\end{proposition}
+\begin{proof}
+Outside $A$, one step always passes. Conditional on the next state $j$, the expected remaining time is $h(j)$ by the Markov property and time-homogeneity. Average over $j$. Starting inside $A$ requires no steps.
+\end{proof}
+
+\textbf{Standard repair.} Each Broken day has repair-success probability $0.6$. Success reaches $W$, and failure leaves $B$. Then
+\[
+h(B)=0.6(1)+0.4[1+h(B)]=1+0.4h(B),
+\qquad \boxed{h(B)=5/3\text{ days}.}
+\]
+Finiteness follows, for instance, from the geometric survival tail derived below. The $1$ counts the first day on \emph{both} branches. Using $0.6+0.4h(B)$ would omit the day spent on failed attempts. The actual time is integer-valued; its expectation need not be.
+
+\textbf{Standard once, then Intensive.} Let $B_1$ be the first Broken morning in a run, and $B_{2+}$ any later consecutive Broken morning. Standard succeeds with probability $0.6$ and Intensive with probability $0.9$. The policy uses Standard in $B_1$ and Intensive in $B_{2+}$. Thus
+\[
+h(B_1)=1+0.4h(B_{2+}),\qquad
+h(B_{2+})=1+0.1h(B_{2+}),
+\]
+so
+\[
+\boxed{h(B_{2+})=10/9,\qquad h(B_1)=1+0.4(10/9)=13/9.}
+\]
+The continuation coefficient from $B_1$ is the \emph{failure} probability $0.4$, not the success probability $0.6$. Successful repair leaves zero remaining wait.
+
+\clearpage
+\subsection{Absorption and the matrix of non-target transitions}
+To study first arrival at $W$, we may modify the chain to remain there forever after arrival. This changes only post-arrival behavior and preserves the hitting time. In order $(B_1,B_{2+},W)$,
+\[
+\widetilde P=\begin{pmatrix}0&0.4&0.6\\0&0.1&0.9\\0&0&1\end{pmatrix}.
+\]
+\begin{definition}[Absorbing state and restricted matrix]
+A state $a$ is absorbing when $P_{aa}=1$. For states outside a target set, let $Q$ be the submatrix containing transitions between those states. It is substochastic: entries are nonnegative and row sums are at most one. The missing probability leads into the target.
+\end{definition}
+In the repair example,
+\[
+Q=\begin{pmatrix}0&0.4\\0&0.1\end{pmatrix},\qquad
+h=\begin{pmatrix}h(B_1)\\h(B_{2+})\end{pmatrix}.
+\]
+The first-step equations are precisely
+\[
+\boxed{h=\mathbf1+Qh,\qquad (I-Q)h=\mathbf1,}
+\]
+where $\mathbf1=(1,1)^{\mathsf T}$. We exclude $W$ because its remaining hitting time is zero, not because the physical machine is incapable of another breakdown.
+
+\subsection{Survival probabilities and the tail-sum formula}
+For initial distribution $\alpha$ on the non-target states,
+\[
+(\alpha Q^n)_j=\Prob_\alpha(X_n=j,\ T_A>n),\qquad
+\boxed{\Prob_\alpha(T_A>n)=\alpha Q^n\mathbf1.}
+\]
+These are unconditional probabilities of remaining outside the target; they are not normalized conditional distributions given survival. To obtain the latter, divide by $\alpha Q^n\mathbf1$ when it is positive.
+
+Starting in $B_1$, $\alpha=(1,0)$ gives
+\[
+\alpha Q=(0,0.4),\quad \alpha Q^2=(0,0.04),\quad
+\Prob(T_A>n)=0.4(0.1)^{n-1}\quad(n\geq1).
+\]
+\begin{theorem}[Tail-sum formula]
+For a nonnegative integer-valued random variable $T$, allowing $T=\infty$,
+\[
+\E[T]=\sum_{n=0}^\infty\Prob(T>n).
+\]
+\end{theorem}
+\begin{proof}
+Pointwise, $T=\sum_{n\geq0}\mathbf1_{\{T>n\}}$. If $T=k$, exactly $k$ terms are one. Taking expectations and interchanging nonnegative summands by monotone convergence proves the identity, including infinite expectations.
+\end{proof}
+Consequently, the repair expectation is
+\[
+\E_{B_1}[T_A]=1+\sum_{k=0}^\infty0.4(0.1)^k
+=1+\frac{0.4}{0.9}=\frac{13}{9}.
+\]
+
+
+\clearpage
+\subsection{The fundamental matrix and expected visit counts}
+\begin{theorem}[Fundamental matrix]
+For a finite chain that reaches the target almost surely from every non-target state, the series
+\[
+\boxed{N=\sum_{n=0}^\infty Q^n=(I-Q)^{-1}}
+\]
+converges. Moreover, $h=N\mathbf1$ gives the expected target hitting times.
+\end{theorem}
+\begin{proof}
+Finiteness and almost-sure absorption imply that there are $L\geq1$ and $\varepsilon>0$ such that absorption within $L$ steps has probability at least $\varepsilon$ from every non-target state. By conditioning at successive blocks of $L$ steps, survival through $kL$ steps has probability at most $(1-\varepsilon)^k$. Thus the matrix series converges and $Q^n\to0$. The finite geometric identity
+$(I-Q)\sum_{n=0}^mQ^n=I-Q^{m+1}$
+then proves the inverse formula. The tail-sum identity proves $h=N\mathbf1$.
+\end{proof}
+\begin{proposition}[Occupation-count interpretation]
+For non-target states $i,j$,
+\[
+\boxed{N_{ij}=\E_i\!\left[\sum_{n=0}^{T_A-1}\mathbf1_{\{X_n=j\}}\right].}
+\]
+It is the expected number of visits to $j$ before absorption, starting at $i$, including time zero when $i=j$.
+\end{proposition}
+\begin{proof}
+The probability of occupying $j$ at time $n$ before absorption is $(Q^n)_{ij}$. Sum the corresponding indicators over time and take expectations. Nonnegativity justifies exchanging expectation and the infinite sum:
+\[
+\E_i\sum_{n\geq0}\mathbf1_{\{X_n=j,\ T_A>n\}}
+=\sum_{n\geq0}(Q^n)_{ij}=N_{ij}.
+\]
+No independence between visits is required.
+\end{proof}
+Summing over $j$ counts each time $0,\ldots,T_A-1$ exactly once, since the chain occupies one non-target state at each such time. This supplies a second explanation for $h=N\mathbf1$.
+
+\textbf{Repair matrix.} Direct inversion yields
+\[
+I-Q=\begin{pmatrix}1&-0.4\\0&0.9\end{pmatrix},\qquad
+N=\begin{pmatrix}1&4/9\\0&10/9\end{pmatrix}.
+\]
+There is exactly one visit to $B_1$ when starting there: any subsequent return requires first passing through $W$, where counting stops. Starting in $B_1$, the probabilities of occupying $B_{2+}$ at times $0,1,2,\ldots$ are $0,0.4,0.04,\ldots$, whose sum is $4/9$.
+
+Consecutive occupancy counts as repeated visits: the path $B_1,B_{2+},B_{2+},W$ contributes two visits to $B_{2+}$. A visit does not require leaving and re-entering.
+
+\clearpage
+\subsection{Costs until repair and fixed-policy comparisons}
+Let $c_j$ be the cost per visit to non-target state $j$, incurred before its next transition. Expected total cost before absorption is
+\[
+g_i=\E_i\sum_{n=0}^{T_A-1}c_{X_n}
+=\sum_jN_{ij}c_j,\qquad \boxed{g=Nc.}
+\]
+Equivalently, first-step analysis gives $g=c+Qg$. The waiting-time calculation is the special case $c=\mathbf1$. These formulas apply to nonnegative costs; finite-state bounded costs also have finite absolute expected total under the preceding absorption assumptions.
+
+\textbf{Worked repair cost.} Standard costs $10$ dollars and Intensive costs $30$, giving
+\[
+c=\begin{pmatrix}10\\30\end{pmatrix},\qquad
+g=\begin{pmatrix}1&4/9\\0&10/9\end{pmatrix}
+\begin{pmatrix}10\\30\end{pmatrix}
+=\begin{pmatrix}70/3\\100/3\end{pmatrix}.
+\]
+Starting in $B_1$, expected cost is $10+30(4/9)=70/3$ dollars. This pays for the first Standard attempt and the expected number of later Intensive attempts.
+
+\textbf{Downtime costs.} If every attempt also incurs $d\geq0$ dollars of downtime, expected total cost equals repair cost plus $d$ times expected days. Starting with the first Broken day:
+\begin{center}
+\begin{tabular}{@{}lll@{}}\toprule
+Policy & Expected days & Expected repair cost\\\midrule
+Always Standard & $5/3$ & $50/3$\\
+Standard once, then Intensive & $13/9$ & $70/3$\\\bottomrule
+\end{tabular}
+\end{center}
+The second policy has lower total cost exactly when
+\[
+\frac{70}{3}+\frac{13d}{9}<\frac{50}{3}+\frac{5d}{3}
+\iff \frac{20}{3}-\frac{2d}{9}<0
+\iff \boxed{d>30}.
+\]
+At $d=30$ they tie. Switching adds $20/3$ dollars in expected repair cost but saves $2/9$ of a day. The inequality direction matters: a positive cost difference means the first-listed policy is more expensive.
+
+This only compares two specified policies. It does not establish optimality over all possible action choices. In particular, starting immediately with Intensive has not yet been considered.
+
+\subsection{When an expected hitting time is infinite}
+If $\Prob_i(T_A=\infty)=\varepsilon>0$, then $\Prob_i(T_A>n)\geq\varepsilon$ for every $n$, so the tail-sum formula gives $\E_i[T_A]=\infty$. It is an extended expectation, not an undefined cancellation: $T_A$ is nonnegative.
+
+A permanently Broken state reachable with positive probability produces this situation. Expected time conditional on eventual success, $\E_i[T_A\mid T_A<\infty]$, is a different quantity. On an infinite state space, even almost-sure hitting need not imply finite expectation; the finite-state hypothesis in our theorem matters.
+
+\clearpage
+\subsection{Optimizing repair: a stochastic shortest-path problem}
+Now permit either repair action on every Broken day. Success probabilities and costs depend only on the action, not on the number of past failures. Thus $B_1,B_{2+}$ need not be distinct physical states for this optimization problem. Define $J^*(B)$ as the minimum expected total cost to reach $W$, and set $J^*(W)=0$.
+
+The Bellman optimality equation is
+\[
+\boxed{J^*(B)=\min\{d+10+0.4J^*(B),\ d+30+0.1J^*(B)\}.}
+\]
+Each expression includes today's downtime, today's action cost, and optimal continuation after failure. Both actions have the same continuation value: selecting Standard today does not commit us to Standard tomorrow.
+
+\textbf{Action comparison.} Intensive minus Standard is
+\[
+20-0.3J^*(B).
+\]
+Intensive is strictly better when this is negative, that is, when $J^*(B)>200/3$.
+
+\textbf{Standard branch.} If Standard attains the minimum,
+\[
+J^*(B)=\frac{d+10}{0.6}.
+\]
+Consistency requires $(d+10)/0.6\leq200/3$, equivalent to $d\leq30$.
+
+\textbf{Intensive branch.} If Intensive attains the minimum,
+\[
+J^*(B)=\frac{d+30}{0.9}.
+\]
+Consistency requires $(d+30)/0.9\geq200/3$, equivalent to $d\geq30$. In particular, $10d+300>600$ implies $d>30$, not $d>20$.
+
+\begin{proposition}[Optimal repair rule]
+For $d\geq0$,
+\[
+J^*(B)=\begin{cases}(d+10)/0.6,&d\leq30,\\(d+30)/0.9,&d\geq30.\end{cases}
+\]
+Always Standard is optimal for $d<30$; always Intensive is optimal for $d>30$. At $d=30$, either action, or any mixture or history-dependent sequence of them, is optimal.
+\end{proposition}
+\begin{proof}
+The Bellman map $F(x)=\min\{d+10+0.4x,d+30+0.1x\}$ is a contraction with Lipschitz constant at most $0.4$, so has a unique fixed point. Finite-horizon costs with zero terminal cost converge to it: under any policy, survival after $n$ attempts is at most $0.4^n$, and per-attempt cost is at most $d+30$. Hence remaining expected costs vanish uniformly. The branch calculations identify the fixed point and minimizing actions. Repeated use of an attaining action realizes this value. At the tie, either action satisfies the same value equation; vanishing tails verify the claim for arbitrary choices.
+\end{proof}
+A failed repair returns us to the same decision problem. Past spending is a sunk cost. If failures revealed an unknown fault type, or changed success probabilities, the model would require additional state information and the conclusion could change.
+
+\clearpage
+\subsection{Filtrations and stopping times}
+\begin{definition}[Filtration and natural filtration]
+On a probability space $(\Omega,\mathcal F,\Prob)$, a filtration is an increasing family of sigma-algebras $\mathcal F_0\subseteq\mathcal F_1\subseteq\cdots\subseteq\mathcal F$. It represents accumulating information. For a chain, its natural filtration is $\mathcal F_n=\sigma(X_0,\ldots,X_n)$.
+\end{definition}
+An event in $\mathcal F_n$ can be determined from observations available by time $n$. A sigma-algebra is a collection of events containing $\Omega$ and closed under complements and countable unions; it specifies the events whose occurrence is measurable using that information.
+
+\begin{definition}[Stopping time]
+A random time $\tau:\Omega\to\{0,1,2,\ldots\}\cup\{\infty\}$ is a stopping time relative to $(\mathcal F_n)$ if
+\[
+\{\tau\leq n\}\in\mathcal F_n\quad\text{for every }n.
+\]
+In discrete time this is equivalent to $\{\tau=n\}\in\mathcal F_n$ for every $n$.
+\end{definition}
+You need not know $\tau$ in advance. You must be able to recognize whether it has occurred without observing the future. The physical process need not stop; the time may simply mark an observation or decision.
+
+\textbf{Example: first arrival.} For $\tau_j=\inf\{n\geq0:X_n=j\}$,
+\[
+\{\tau_j\leq n\}=\bigcup_{k=0}^n\{X_k=j\}\in\mathcal F_n,
+\]
+so $\tau_j$ is a stopping time. A deterministic time is also a stopping time.
+
+\textbf{Nonexample: last Working time before a deadline.} The last occurrence of $W$ among times $0,\ldots,10$ is generally not a stopping time. At time three, knowing the current and earlier states does not determine whether another Working observation will occur later. This uses future information (apart from special degenerate models).
+
+The information available at a stopping time is formalized by
+\[
+\mathcal F_\tau=\{E\in\mathcal F:E\cap\{\tau\leq n\}\in\mathcal F_n\text{ for all }n\}.
+\]
+
+\subsection{The strong Markov property}
+\begin{theorem}[Strong Markov property, discrete time]
+For a time-homogeneous Markov chain and a stopping time $\tau$, on $\{\tau<\infty\}$, conditional on $X_\tau$, the future after $\tau$ is independent of $\mathcal F_\tau$ and has the law of the chain started at $X_\tau$. For $k\geq1$,
+\[
+\Prob(X_{\tau+1}=j_1,\ldots,X_{\tau+k}=j_k\mid\mathcal F_\tau)
+=P_{X_\tau j_1}\prod_{\ell=1}^{k-1}P_{j_\ell j_{\ell+1}}.
+\]
+In particular, $\Prob(X_{\tau+k}=j\mid\mathcal F_\tau)=(P^k)_{X_\tau j}$.
+\end{theorem}
+This extends the Markov property from fixed times to stopping times, not arbitrary random times. For discrete-time Markov chains it is a theorem, not an additional modelling assumption.
+
+\clearpage
+\subsection{Restarting at a first visit: proof and application}
+\begin{proof}[Proof of the strong Markov property]
+Let $E\in\mathcal F_\tau$. For every finite $n$, the event $E\cap\{\tau=n\}$ lies in $\mathcal F_n$. Apply the ordinary Markov property at deterministic time $n$ to the chosen future-state sequence and this event, then sum over $n\geq0$. The resulting expectation identity for every $E\in\mathcal F_\tau$ proves the displayed conditional-probability formula on $\{\tau<\infty\}$. Finite sequences determine the law of the future process.
+\end{proof}
+
+\textbf{Why it matters.} Arrival at $j$ happens at a random time and may depend on a long history. The strong Markov property licenses using the expected future visit count for a fresh start at $j$ at that first arrival.
+
+\begin{proposition}[Hitting probabilities from the fundamental matrix]
+Under the finite absorbing-chain assumptions, for non-target states $i,j$ and $\tau_j=\inf\{n\geq0:X_n=j\}$,
+\[
+\boxed{\Prob_i(\tau_j<T_A)=\frac{N_{ij}}{N_{jj}}.}
+\]
+For $i=j$, the probability is one because the initial visit counts; it is not a positive-time return probability.
+\end{proposition}
+\begin{proof}
+Let $K_j=\sum_{n=0}^{T_A-1}\mathbf1_{\{X_n=j\}}$. On $\{\tau_j\geq T_A\}$, $K_j=0$. On $\{\tau_j<T_A\}$, there are no visits to $j$ before $\tau_j$. From that first arrival onward, the expected count is $N_{jj}$, including arrival, by the strong Markov property. Therefore
+\[
+N_{ij}=\E_i[K_j]=\Prob_i(\tau_j<T_A)N_{jj}.
+\]
+Since $N_{jj}\geq1$, division is valid. If the hitting probability is zero, both the expected count and the numerator are zero; no conditioning on a zero-probability event is needed.
+\end{proof}
+
+\textbf{Visit probability versus visit count.} In the repair example,
+\[
+\Prob_{B_1}(\text{reach }B_{2+}\text{ before }W)
+=\frac{4/9}{10/9}=0.4.
+\]
+Forty percent of paths enter $B_{2+}$. Conditional on entering, they contribute an average of $10/9$ visits, giving $N_{12}=0.4(10/9)=4/9$.
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}\toprule
+Path & Ever enters $B_{2+}$? & Visit count\\\midrule
+$B_1\to W$ & No & 0\\
+$B_1\to B_{2+}\to W$ & Yes & 1\\
+$B_1\to B_{2+}\to B_{2+}\to W$ & Yes & 2\\\bottomrule
+\end{tabular}\end{center}
+For $K$ denoting the count, $\Prob(K\geq1)$ averages a yes/no indicator, whereas $\E[K]$ averages all visits. The matrix $N$ contains counts; dividing by $N_{jj}$ converts them to first-visit probabilities.
+
+\clearpage
+\subsection{Review exercises and solutions}
+\begin{enumerate}
+\item Explain the difference between $\mu Pr$ and $\mu(r+Pr)$.
+\item Standard repair succeeds with probability $0.6$. Derive its expected repair time by conditioning on success or failure after the first day.
+\item With Standard once then Intensive, write $Q$ and compute $N$, $h$, and the survival probability after three steps starting in $B_1$.
+\item Why does $N_{11}=1$ in this model? What is $N_{12}$, and why is it different from the probability of ever visiting $B_{2+}$?
+\item Let Standard cost $10$ and Intensive cost $30$. Compute total repair costs under the fixed switching policy. What happens if each day also costs $d$?
+\item Write the optimal-cost Bellman equation when either action is available each day. Determine the optimal action for $d=20$, $d=30$, and $d=40$.
+\item If the target is never reached with positive probability, is the expected hitting time undefined or infinite? Justify using survival probabilities.
+\item Define a stopping time. Explain why first arrival is one and last arrival before a deadline generally is not.
+\item Prove $\Prob_i(\tau_j<T_A)=N_{ij}/N_{jj}$ and identify the precise role of the strong Markov property.
+\end{enumerate}
+\clearpage
+\textbf{Lesson 3: Review solutions.}
+\begin{enumerate}
+\item $\mu Pr$ is the expected state reward at time one; $\mu(r+Pr)$ includes rewards at times zero and one.
+\item $h=0.6(1)+0.4(1+h)=1+0.4h$, so $h=5/3$. One day passes on either outcome.
+\item $Q=\left(\begin{smallmatrix}0&0.4\\0&0.1\end{smallmatrix}\right)$,
+$N=\left(\begin{smallmatrix}1&4/9\\0&10/9\end{smallmatrix}\right)$,
+and $h=(13/9,10/9)^{\mathsf T}$. The survival probability is $0.4(0.1)^2=0.004$.
+\item The initial visit is the only visit to $B_1$ before absorption. $N_{12}=4/9$ counts repeated occupancy of $B_{2+}$; ever entering has probability $0.4$.
+\item $g=N(10,30)^{\mathsf T}=(70/3,100/3)^{\mathsf T}$. Add $dh$ for downtime. Starting in $B_1$, switching beats always Standard exactly when $d>30$.
+\item $J=\min\{d+10+0.4J,d+30+0.1J\}$. At $d=20$, Standard is optimal with $J=50$. At $d=30$, either is optimal with $J=200/3$. At $d=40$, Intensive is optimal with $J=700/9$.
+\item Infinite. If nonarrival has probability $\varepsilon>0$, every survival probability is at least $\varepsilon$, so their sum diverges.
+\item $\{\tau\leq n\}\in\mathcal F_n$ for every $n$. First arrival is detectable from observations to date; last arrival generally requires knowing future observations.
+\item Split paths according to whether they reach $j$. Paths that do not contribute zero visits. For paths that do, the strong Markov property at first arrival gives expected subsequent count $N_{jj}$, including arrival. Thus $N_{ij}=\Prob_i(\tau_j<T_A)N_{jj}$.
+\end{enumerate}
+
+
+\clearpage
+\fancyhead[R]{\small Lesson 4}
+\section{Lesson 4: Discounted returns and Bellman equations}
+\textbf{Scope.} This lesson develops infinite-horizon discounted values, matrix evaluation, contraction, residual error bounds, and value iteration.
+
+\subsection{Discounting and existence of the return}
+Let $P$ be the transition matrix of a finite time-homogeneous Markov chain, and let $r(i)$ be the reward received at time $t$ when $X_t=i$. Choose $0<\gamma<1$.
+\begin{definition}[Discounted return and value]
+The discounted return and its expected value are
+\[
+G=\sum_{t=0}^\infty\gamma^t r(X_t),\qquad
+v(i)=\E_i[G].
+\]
+Rewards at times zero, one, and two have weights $1,\gamma,\gamma^2$, respectively. Discounting is part of the objective, not a change to the transition probabilities.
+\end{definition}
+If $|r(i)|\leq M$, then on every sample path
+\[
+\sum_{t=0}^\infty|\gamma^t r(X_t)|\leq M\sum_{t=0}^\infty\gamma^t
+=\frac{M}{1-\gamma}.
+\]
+Thus the return converges absolutely and has finite expectation. This also justifies exchanging expectations with the discounted series.
+
+\subsection{Deriving the Bellman expectation equation}
+Separate the initial reward:
+\[
+G=r(X_0)+\gamma\sum_{k=0}^\infty\gamma^k r(X_{k+1}).
+\]
+Conditional on $X_1=j$, the expected sum on the right is $v(j)$, by the Markov property and time-homogeneity. Starting in $i$, average over the possible next states:
+\[
+\boxed{v(i)=r(i)+\gamma\sum_jP_{ij}v(j).}
+\]
+The state label $i$ is not a time index: the immediate reward is $r(i)$, not $r(X_i)$. A particular next-state continuation $v(j)$ must be averaged unless the transition is deterministic.
+
+As column vectors, the equation reads
+\[
+v=r+\gamma Pv,\qquad (I-\gamma P)v=r.
+\]
+This is a \emph{policy evaluation} equation when $P=P^\pi$ and $r=r^\pi$ come from a fixed stationary policy. It contains no optimization over actions.
+
+\textbf{One-state example.} A state that pays $4$ each step and returns to itself has $v=4+0.8v$, so $v=20$ when $\gamma=0.8$.
+
+\clearpage
+\subsection{The discounted matrix series}
+\begin{theorem}[Discounted inverse]
+For finite stochastic $P$ and $0<\gamma<1$,
+\[
+\boxed{(I-\gamma P)^{-1}=\sum_{k=0}^\infty\gamma^kP^k,\qquad
+v=(I-\gamma P)^{-1}r.}
+\]
+No irreducibility or aperiodicity assumption is required.
+\end{theorem}
+\begin{proof}
+For $S_n=I+\gamma P+\cdots+\gamma^nP^n$, telescoping gives
+\[
+(I-\gamma P)S_n=I-\gamma^{n+1}P^{n+1}.
+\]
+The induced infinity norm is $\|A\|_\infty=\max_i\sum_j|A_{ij}|$. Since every $P^k$ is stochastic, $\|P^k\|_\infty=1$. Hence
+\[
+\|\gamma^{n+1}P^{n+1}\|_\infty=\gamma^{n+1}\to0,
+\quad \sum_{k=0}^\infty\|\gamma^kP^k\|_\infty=\frac1{1-\gamma}<\infty.
+\]
+So $S_n$ converges to a matrix $S$ with $(I-\gamma P)S=I$. For square matrices this proves invertibility and identifies the inverse. Substitution into the Bellman equation yields the value formula.
+\end{proof}
+The initial $I$ survives the telescoping calculation along with the last negative term. Boundedness of $P^k$ is enough; $P^k$ itself need not converge. For example, deterministic alternation remains periodic while its discounted series converges.
+
+\subsection{Bellman updates, uniqueness, and convergence}
+\begin{definition}[Bellman expectation operator]
+For a candidate value vector $x$, set $\mathcal T(x)=r+\gamma Px$. A fixed point satisfies the Bellman expectation equation.
+\end{definition}
+\begin{theorem}[Contraction and iterative evaluation]
+For all $x,y$,
+\[
+\|\mathcal T(x)-\mathcal T(y)\|_\infty\leq\gamma\|x-y\|_\infty.
+\]
+The fixed point is unique. Iteration $v_{k+1}=\mathcal T(v_k)$ from any $v_0$ obeys
+\[
+\boxed{\|v_k-v\|_\infty\leq\gamma^k\|v_0-v\|_\infty\to0.}
+\]
+\end{theorem}
+\begin{proof}
+The difference is $\gamma P(x-y)$, bounded in norm by $\gamma\|P\|_\infty\|x-y\|_\infty$. For two fixed points, their distance $D$ satisfies $D\leq\gamma D$, forcing $D=0$. Existence was established by the inverse. Apply contraction repeatedly to $v_k$ and $v$ to obtain the iteration bound.
+\end{proof}
+The inequality is non-strict: equality can occur. The exponent for $v_k$ is $k$, corresponding to $k$ updates from $v_0$; $k$ is a computational iteration index.
+
+\clearpage
+\subsection{Residuals and a computable stopping criterion}
+\begin{definition}[Bellman residual]
+The residual of a candidate $x$ is $\delta(x)=\|\mathcal T(x)-x\|_\infty$. It can be computed without knowing the exact value $v$.
+\end{definition}
+Insert $\mathcal T(x)$ between $x$ and the fixed point:
+\[
+x-v=(x-\mathcal T(x))+(\mathcal T(x)-\mathcal T(v)).
+\]
+The triangle inequality and contraction give
+\[
+\|x-v\|_\infty\leq\delta(x)+\gamma\|x-v\|_\infty,
+\]
+so
+\[
+\boxed{\|x-v\|_\infty\leq\frac{\delta(x)}{1-\gamma}.}
+\]
+To certify error at most $\varepsilon$, it is sufficient that $\delta(x)\leq(1-\gamma)\varepsilon$. This bounds the error; it does not set the actual error equal to the tolerance.
+
+\textbf{Worked tolerances.} With $\gamma=0.95$ and $\varepsilon=0.10$, require $\delta(x)\leq0.005$. With $\gamma=0.9$ and residual $0.01$, every component's error is at most $0.1$. Larger $\gamma$ requires a smaller residual for the same certificate. A residual above the threshold does not by itself prove the desired accuracy has failed.
+
+Since $v_{k+1}=\mathcal T(v_k)$, $\delta(v_k)=\|v_{k+1}-v_k\|_\infty$. The computed difference certifies the error of $v_k$; contraction also yields a factor-$\gamma$ tighter bound for $v_{k+1}$.
+
+\subsection{Optimality and value iteration}
+For a finite MDP with bounded expected rewards and nonempty finite action sets, define
+\[
+(\mathcal T_*x)(s)=\max_a\left[r(s,a)+\gamma\sum_{s'}P(s'\mid s,a)x(s')\right].
+\]
+This selects the best first action given continuation values $x$.
+\begin{theorem}[Discounted value iteration]
+The operator $\mathcal T_*$ is a $\gamma$-contraction in the infinity norm. It has a unique fixed point $v^*$, the optimal discounted value. Iteration $v_{k+1}=\mathcal T_*v_k$ converges to it from any initial vector. The same residual bound applies with $\mathcal T_*$ and $v^*$.
+\end{theorem}
+\textit{Reasoning.} The elementary inequality
+$|\max_a u_a-\max_a w_a|\leq\max_a|u_a-w_a|$
+combined with each action's stochastic row proves contraction, even when the maximizing actions differ. The contraction theorem gives a unique fixed point. Starting at zero, the $k$th iterate is the optimal $k$-step value with zero terminal payoff. The remaining discounted reward is uniformly bounded by $M\gamma^k/(1-\gamma)$, so these finite-horizon values converge to the infinite-horizon optimum. Selecting a maximizing action in every state at the fixed point gives an optimal stationary policy.
+
+A value-error bound alone need not identify the optimal action when competing action values are close. Model-based value iteration uses known rewards and transitions; learning these from experience comes later in the course.
+
+\clearpage
+\subsection{Worked MDP: Collect or Upgrade}
+There are two states, Basic ($B$) and Upgraded ($U$). Collect in Basic pays $2$ immediately and stays in Basic. Upgrade pays zero immediately and moves deterministically to Upgraded. In Upgraded, the only action pays $3$ and stays there. Thus
+\[
+v^*(U)=3+\gamma v^*(U),\qquad
+v^*(B)=\max\{2+\gamma v^*(B),\ \gamma v^*(U)\}.
+\]
+A scalar continuation needs no extra $P$ here because each action's next state is certain.
+
+\textbf{At $\gamma=0.9$.} First solve $v^*(U)=3/(1-0.9)=30$. Upgrading now from Basic gives $27$. If $v^*(B)=27$, collecting once and then acting optimally gives $2+0.9(27)=26.3<27$. Therefore the candidate is consistent with the Bellman equation, and uniqueness establishes $v^*(B)=27$ with Upgrade optimal.
+
+\textbf{Notation and timing.} These are distinct quantities:
+\begin{center}
+\begin{tabular}{@{}ll@{}}\toprule
+Quantity & Value\\\midrule
+Already in Upgraded & $3/(1-\gamma)$\\
+Upgrade now from Basic & $3\gamma/(1-\gamma)$\\
+Collect forever from Basic & $2/(1-\gamma)$\\
+Collect once, then act optimally & $2+\gamma v^*(B)$\\\bottomrule
+\end{tabular}
+\end{center}
+A specified policy value need not carry a star. The star denotes optimization over future decisions, not merely a chosen first action.
+
+\textbf{Patience threshold.} The common denominator is positive, so
+\[
+\frac{3\gamma}{1-\gamma}>\frac2{1-\gamma}\iff\gamma>2/3.
+\]
+For $\gamma$ near zero, the immediate Collect reward dominates.
+
+\textbf{Can delaying Upgrade help?} Collecting for $k$ steps and then upgrading gives
+\[
+\frac{2(1-\gamma^k)}{1-\gamma}+\frac{3\gamma^{k+1}}{1-\gamma}
+=\frac{2+\gamma^k(3\gamma-2)}{1-\gamma}.
+\]
+If $\gamma>2/3$, this is maximized at $k=0$. If $\gamma<2/3$, it increases toward the collect-forever value as $k\to\infty$. At equality, every delay ties. Randomizing the delay cannot exceed the best of these values. This formalizes the intuition that collecting returns us to the same state, horizon, and decision problem.
+
+\textbf{Early value-iteration decisions.} At $\gamma=0.9$, initialize $v_0=(0,0)$. Then $v_1=(2,3)$. The second update compares $3.8$ for Collect with $2.7$ for Upgrade, so $v_2=(3.8,5.7)$. The short horizon favors Collect. Further iterations include more opportunities to earn the upgraded reward, ultimately yielding $v^*=(27,30)$.
+
+\clearpage
+\subsection{Lesson 4 quiz and solutions}
+\textbf{Format: three questions, 10--15 minutes maximum.}
+\begin{enumerate}
+\item Explain the difference between the value of already being Upgraded and choosing Upgrade while in Basic.
+\item A state pays $4$ immediately each step and returns to itself. At $\gamma=0.8$, write its Bellman equation and find its value.
+\item In an absorbing chain, $N_{ij}=2$ and $N_{jj}=4$. Find the probability of reaching $j$ before absorption starting at $i$, and explain why.
+\end{enumerate}
+\textbf{Solutions.}
+\begin{enumerate}
+\item Already Upgraded receives $3$ starting now. Choosing Upgrade receives zero now and $3$ from the next step onward, introducing a factor of $\gamma$.
+\item $V=4+0.8V$, so $V=20$.
+\item The probability is $N_{ij}/N_{jj}=1/2$. If $p$ is the hitting probability, paths missing $j$ contribute zero visits. Once $j$ is first reached, the expected count including arrival is $N_{jj}=4$ by the strong Markov property. Thus $2=p(4)$.
+\end{enumerate}
+
+\subsection{Why the inverse counts visits}
+The series $N=\sum_{k\geq0}Q^k$ gives the direct interpretation: $(Q^k)_{ij}$ is the probability of occupying $j$ at time $k$ before absorption, conditional on starting at $i$. Summing indicators and taking expectations yields the expected count, including time zero only if $i=j$.
+
+One can also derive the inverse without starting with the series. Define $F_{ij}$ to be the expected number of visits to $j$ before absorption from $i$. In the finite transient setting, first-step analysis gives
+\[
+F_{ij}=\mathbf1_{\{i=j\}}+\sum_kQ_{ik}F_{kj}.
+\]
+The first term counts a visit now; the sum averages all future visits after the first transition. In matrix form,
+\[
+F=I+QF\quad\Longrightarrow\quad(I-Q)F=I
+\quad\Longrightarrow\quad\boxed{F=(I-Q)^{-1}=N.}
+\]
+The inverse alone hides the probabilistic interpretation; the series and first-step derivations explain it in complementary ways. Expected counts can exceed one because a single path can contribute visits at several times. They are not probabilities of ever visiting.
+
+
+\clearpage
+\fancyhead[R]{\small Course plan}
+\section*{Course structure and assessment plan}
+\addcontentsline{toc}{section}{Course structure and assessment plan}
+\textbf{Adopted October 12, 2026.} This is a self-paced class with graded work, feedback, corrections, two midterms, a cumulative final, and a small applied project. It remains a course in stochastic modelling with reinforcement learning as a principal application.
+
+\subsection*{Workload and assessment}
+\begin{center}\small
+\begin{tabular}{@{}p{1.12in}p{2.95in}r@{}}\toprule
+Component & Format and timing & Weight\\\midrule
+Lesson quizzes & Three questions, 10--15 minutes maximum, after each lesson & 10\%\\
+Homework & Three or four problems every two lessons; about 45--60 minutes & 25\%\\
+Midterm I & After Lesson 8; 60 minutes; Lessons 1--8 & 15\%\\
+Midterm II & After Lesson 16; 60 minutes; cumulative, emphasizing 9--16 & 15\%\\
+Final exam & After Lesson 25; 90 minutes; cumulative & 25\%\\
+Applied project & Small model, exact or simulation benchmark, learned/control policy, short explanation & 10\%\\\bottomrule
+\end{tabular}\end{center}
+Quizzes stay short even when lessons expand. Homework is open-notes; explain reasoning and identify hints used. Programming begins after relevant implementation instruction. For exams, default to one self-prepared formula sheet and a calculator; attempt independently, with teaching and hints reserved for feedback afterward. Timers are self-managed and can be split into agreed blocks when needed.
+
+Work is due by a \emph{course milestone}, not an imposed calendar date. Submit homework before starting the next assigned block, or explicitly defer it. No automatic recurring lessons, reminders, or accumulating daily tasks are created. The new homework sequence starts now; there is no retroactive backlog for Lessons 1--3. Earlier quizzes remain formative.
+
+Grading emphasizes model setup and interpretation (40\%), reasoning (40\%), and calculations or implementation (20\%). Each new assessment reports points and specific review targets. Corrections are encouraged; retain both original and revised results, with full credit awarded for correct revisions and explanations. Any course grade is a learning aid, not an accredited qualification.
+
+\subsection*{Spaced repetition and feedback}
+Begin sessions with 3--5 minutes of unaided retrieval from earlier lessons, generally one question at a time. Revisit uncertain ideas next session; extend successful recall toward gaps of approximately one, three, and seven lessons, adjusted for calendar gaps. Each homework includes one older concept. Quiz and exam errors feed the review queue; success means explaining an idea as well as recalling its formula.
+
+Give central definitions before use, guide important derivations, and keep supporting algebra concise. Phone-friendly lesson questions remain distinct from homework that benefits from paper or code. Three-question quizzes can be supplied together for offline completion when requested.
+
+\clearpage
+\subsection*{Curriculum and assessment milestones}
+\begin{center}\small
+\begin{tabular}{@{}p{0.62in}p{3.3in}p{1.05in}@{}}\toprule
+Lessons & Focus & Milestone\\\midrule
+1--4 & Markov chains; absorption; stopping times; discounted Bellman equations & Completed; HW 1 below\\
+5--6 & Policy improvement, policy iteration, Python MDP solver & HW 2\\
+7--8 & Monte Carlo estimation, uncertainty, exact benchmarks & HW 3; Midterm I\\
+9--10 & Bandits: exploration, UCB, Thompson sampling & HW 4\\
+11--13 & TD learning, SARSA, Q-learning & HW 5 after 12\\
+14--16 & Poisson processes, continuous-time chains, queues & HW 6 after 14; HW 7 after 16; Midterm II\\
+17--19 & Martingales, optional stopping, optimal stopping & HW 8 after 18\\
+20--22 & Function approximation, DQN, policy gradients, actor--critic & HW 9 after 20; HW 10 after 22\\
+23--25 & Brownian motion, introductory It\^o calculus and SDE simulation & HW 11 after 24; final exam\\
+26 onward & Applied project completion and selected extensions & Project presentation\\\bottomrule
+\end{tabular}\end{center}
+These are topic blocks, not rigid calendar weeks. A difficult topic may take multiple short sessions without multiplying assignments. Midterm I tests foundations and computation; Midterm II adds learning from experience and continuous-time modelling; the final integrates the full taught course. Untaught material is excluded if the sequence changes.
+
+\textbf{Project scope.} Choose maintenance, inventory, or a simplified execution model by Lesson 16. Build a small known-model benchmark first; then compare simulation or learning against it. Plan roughly 4--6 hours total across milestones, increasing scope only by agreement. Submit reproducible code, a concise results table or plot, and a two-page explanation of assumptions, findings, and limitations. The project is separate from the 90-minute final exam.
+
+\clearpage
+\subsection*{Homework 1: discounted values and visit counts}
+\textbf{Practice after Lesson 4.} Target 45 minutes, maximum 60; open notes, no code required. Total 20 points. Show enough reasoning to distinguish a recalled formula from an understood result. Worked solutions follow.
+\begin{enumerate}
+\item \textbf{Reward timing and decisions (8 points).} Modify Basic/Upgraded: Collect pays $2$ and stays Basic; Upgrade costs $1$ immediately (reward $-1$) and moves to Upgraded; Upgraded pays $3$ each step forever. Let $\gamma=0.8$. Write the two Bellman optimality equations, solve them, and verify the chosen Basic action against the alternative. Explain why collecting once does not commit you to collecting forever.
+\item \textbf{A stopping certificate (5 points).} At $\gamma=0.9$, a candidate value vector has Bellman residual $0.02$. What value-error bound follows? What residual would certify error at most $0.05$? Explain whether failing that residual threshold proves the actual error exceeds $0.05$.
+\item \textbf{Spaced review: visits and hitting (7 points).} The non-target states are $A,B$, and
+\[
+Q=\begin{pmatrix}0&1/2\\0&1/2\end{pmatrix}.
+\]
+Missing row mass goes to an absorbing target. Derive expected visits to $B$ starting from $B$, then from $A$, using first-step reasoning. Use these counts to find the probability of ever reaching $B$ from $A$. Finally find the expected time to absorption starting from $A$. Explain why expected visits and a hitting probability need not be equal.
+\end{enumerate}
+
+
+\clearpage
+\fancyhead[R]{\small Homework 1 solutions}
+\section*{Homework 1: worked solutions}
+\addcontentsline{toc}{section}{Homework 1: worked solutions}
+
+\subsection*{1. Reward timing and decisions}
+Rewards are received at the current step; the next state's value is discounted once. Thus
+\[
+V^*(U)=3+0.8V^*(U),\qquad
+V^*(B)=\max\{2+0.8V^*(B),\,-1+0.8V^*(U)\}.
+\]
+The first equation gives $V^*(U)=3/(1-0.8)=15$. Upgrading immediately from Basic therefore has value
+\[
+-1+0.8(15)=11.
+\]
+To verify $V^*(B)=11$, substitute it into both action values:
+\[
+\underbrace{2+0.8(11)}_{\text{Collect, then act optimally}}=10.8
+\quad<\quad
+\underbrace{-1+0.8(15)}_{\text{Upgrade now}}=11.
+\]
+Hence $V^*(B)=11$ satisfies the Bellman equation, and its maximizing action is Upgrade. Uniqueness of the discounted Bellman fixed point establishes optimality.
+
+Collecting once leaves the system in Basic with a fresh choice next step; it does not prescribe subsequent actions. Collecting forever instead gives $2/(1-0.8)=10$.
+\begin{center}
+\begin{tabular}{lr}\toprule
+State or strategy & Discounted value\\\midrule
+Already Upgraded & $15$\\
+Upgrade immediately from Basic & $11$\\
+Collect once, then upgrade & $10.8$\\
+Collect forever & $10$\\\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{2. Residual certificate}
+For the relevant Bellman operator $\mathcal T$, define
+$\delta(x)=\|\mathcal T x-x\|_\infty$. Its fixed point $v$ satisfies
+\[
+\|x-v\|_\infty\le\frac{\delta(x)}{1-\gamma}.
+\]
+With $\gamma=0.9$ and $\delta(x)=0.02$, this gives
+\[
+\boxed{\|x-v\|_\infty\le0.2.}
+\]
+To certify error at most $0.05$, it suffices that
+\[
+\frac{\delta(x)}{0.1}\le0.05
+\quad\Longleftrightarrow\quad\boxed{\delta(x)\le0.005.}
+\]
+Failing this sufficient threshold does not prove that the actual error exceeds $0.05$: an upper bound larger than $0.05$ leaves room for a smaller actual error.
+
+\clearpage
+\subsection*{3. Visits and hitting probabilities}
+Let $T$ be the first hitting time of the absorbing target, and define
+\[
+N_{ij}=\mathbb E_i\!\left[\sum_{t=0}^{T-1}\mathbf1_{\{X_t=j\}}\right].
+\]
+The initial state contributes a visit if and only if $i=j$. Starting in $B$, first-step analysis gives
+\[
+N_{BB}=1+\tfrac12 N_{BB},\qquad \boxed{N_{BB}=2}.
+\]
+Starting in $A$, there is no initial visit to $B$, and the next state is $B$ with probability $1/2$:
+\[
+N_{AB}=0+\tfrac12 N_{BB}=1.
+\]
+As a matrix check,
+\[
+N=(I-Q)^{-1}
+=\begin{pmatrix}1&-1/2\\0&1/2\end{pmatrix}^{-1}
+=\begin{pmatrix}1&1\\0&2\end{pmatrix}.
+\]
+Let $p=\Pr_A(\tau_B<T)$, with $\tau_B$ the first visit to $B$. Paths that never reach $B$ contribute zero visits. Conditional on first reaching $B$, the strong Markov property gives an expected $N_{BB}=2$ visits, including that arrival. Therefore
+\[
+N_{AB}=pN_{BB}+(1-p)0,
+\qquad \boxed{p=\frac{N_{AB}}{N_{BB}}=\frac12.}
+\]
+For expected absorption times, write $h(i)=\mathbb E_i[T]$ and $h(\text{target})=0$. One step elapses regardless of the next state, so
+\[
+h(B)=1+\tfrac12h(B),\qquad
+h(A)=1+\tfrac12h(B).
+\]
+Thus $h(B)=2$ and $\boxed{h(A)=2}$. Equivalently,
+\[
+h=N\mathbf1=\begin{pmatrix}1&1\\0&2\end{pmatrix}
+\begin{pmatrix}1\\1\end{pmatrix}=\begin{pmatrix}2\\2\end{pmatrix}.
+\]
+A hitting probability counts each path at most once. An occupation count counts every time spent in the state, including consecutive self-transitions; its expectation can exceed one. Here half the paths from $A$ reach $B$, but those that reach it have two visits on average, yielding one expected visit overall.
+
+\clearpage
+\fancyhead[R]{\small Upgrade timing}
+\section*{General result: collect now or upgrade now}
+\addcontentsline{toc}{section}{General result: collect now or upgrade now}
+Assume $0<\gamma<1$. In Basic, Collect pays a constant $c$ and leaves the state unchanged. Upgrading immediately has a fixed total discounted value $A$, including its immediate cost and all subsequent rewards. Rewards, transitions, and available choices do not change with calendar time.
+
+The value of collecting forever is $C=c/(1-\gamma)$. Collecting for $k\ge0$ steps and then upgrading gives
+\[
+V_k=\sum_{t=0}^{k-1}\gamma^t c+\gamma^k A
+=\frac{c(1-\gamma^k)}{1-\gamma}+\gamma^k A
+=\boxed{C+\gamma^k(A-C).}
+\]
+For $k=0$ the sum is empty and $V_0=A$; as $k\to\infty$, $V_k\to C$. Each $V_k$ is a weighted average of $C$ and $A$, so no finite delay can exceed both endpoint values.
+\begin{itemize}
+\item If $A>C$, then $V_k<A$ for every $k\ge1$: upgrade immediately.
+\item If $A<C$, then $V_k<C$ for every finite $k$: collect forever.
+\item If $A=C$, every delay, including never upgrading, has the same value.
+\end{itemize}
+In particular,
+\[
+V_k\ge A\quad\Longleftrightarrow\quad
+\gamma^k(A-C)\ge A-C.
+\]
+Division produces $\gamma^k\ge1$ only when $A>C$. If $A<C$, the inequality reverses; if $A=C$, division is invalid and the original comparison is equality.
+
+\textbf{Upgrade cost and reward threshold.} If upgrading costs $a\ge0$ now and the upgraded state pays $u$ every step starting next step, then
+\[
+A=-a+\frac{\gamma u}{1-\gamma},\qquad
+A-C=\frac{\gamma(u+a)-(c+a)}{1-\gamma}.
+\]
+For $u+a>0$, upgrading now is at least as valuable as collecting forever exactly when
+\[
+\boxed{\gamma\ge\frac{c+a}{u+a}.}
+\]
+In Homework 1, $c=2$, $a=1$, $u=3$, so the threshold is $3/4$. At $\gamma=0.8$, $A=11$, $C=10$, and $V_k=10+0.8^k$.
+
+\textbf{Scope.} A randomized upgrade time is a mixture of these delay strategies and cannot exceed $\max\{A,C\}$. This conclusion relies on an unchanged decision situation while collecting. New information, changing costs, state transitions, or a finite remaining horizon can make a later upgrade optimal.
+
+\end{document}
